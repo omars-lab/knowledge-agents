@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "recording_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Agentic API - Main service monitoring
+  - job_name: 'agentic-api'
+    static_configs:
+      - targets: ['agentic-api:8000']  # Main service port
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    scrape_timeout: 5s
+    
+  # Agentic API - Metrics endpoint
+  - job_name: 'agentic-api-metrics'
+    static_configs:
+      - targets: ['agentic-api:8002']  # Dedicated metrics port
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    scrape_timeout: 5s

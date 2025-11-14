@@ -1,0 +1,219 @@
+# Knowledge Agents: Note Query System - Requirements
+
+## Overview
+
+Knowledge Agents is a personal knowledge management system that answers questions about your notes using AI and semantic search. The system ingests NotePlan markdown files, creates embeddings for semantic search, and provides intelligent answers based on your note content.
+
+## Use Case
+
+This system was built to solve a practical problem: **How do I quickly find and get answers about information in my personal notes?**
+
+Instead of manually searching through hundreds of markdown files, you can ask natural language questions like:
+- "What are my tasks for today?"
+- "What project ideas do I have?"
+- "When did I last update my notes about X?"
+
+The system uses semantic search to find relevant notes and AI to synthesize clear, contextual answers.
+
+## Core Functionality Requirements
+
+### 1. Note Query API
+- Accept natural language questions about notes
+- Return AI-generated answers based on note content
+- Include citations to relevant source files
+- Provide similarity scores for transparency
+
+### 2. Semantic Search
+- Generate embeddings for note file content
+- Perform vector-based semantic search across notes
+- Find relevant notes based on meaning, not just keywords
+- Support similarity scoring for result ranking
+
+### 3. NotePlan Integration
+- Parse NotePlan markdown files from local directory
+- Extract structure: Plans, Buckets (sections), Tasks (todos)
+- Support daily plans (YYYY-MM-DD.md format)
+- Support goal-focused plans
+- Maintain markdown header hierarchy
+
+### 4. Database Storage
+- Store Plans (daily/goal-focused plans)
+- Store Buckets (markdown header sections)
+- Store Tasks (todos with recursive subtask support)
+- Maintain relationships between Plans → Buckets → Tasks
+
+### 5. Vector Store
+- Store embeddings for semantic search
+- Index note file content
+- Store file metadata (path, name, modification time, size)
+- Support similarity queries
+
+## Technical Requirements
+
+### Technology Stack
+- **Language**: Python
+- **Framework**: FastAPI
+- **Agent Framework**: OpenAI Agents
+- **Vector Database**: Qdrant
+- **Relational Database**: PostgreSQL
+- **LLM Proxy**: LiteLLM (connecting to LM Studio for local models)
+
+### Data Model
+- **Plans**: Daily plans and goal-focused plans
+- **Buckets**: Sections from markdown headers (H1-H6)
+- **Tasks**: Todos with status, priority, due dates
+- **Recursive Tasks**: Tasks can have subtasks
+
+### API Requirements
+- RESTful API design
+- JSON request/response format
+- Proper error handling
+- Health check endpoints
+- Metrics collection
+
+### Quality Requirements
+- Input validation (guardrails)
+- Output quality validation
+- Error handling and recovery
+- Comprehensive logging
+- Performance monitoring
+
+## Functional Requirements
+
+### Note Query
+1. **Query Processing**:
+   - Accept natural language questions
+   - Validate query format and content
+   - Perform semantic search to find relevant notes
+   - Generate AI-powered answers
+
+2. **Answer Generation**:
+   - Synthesize information from multiple note files
+   - Provide clear, contextual answers
+   - Cite relevant source files
+   - Indicate when information is not found
+
+3. **Guardrails**:
+   - Validate queries are about notes (not random requests)
+   - Validate answer quality and completeness
+   - Handle edge cases gracefully
+
+### NotePlan Parsing
+1. **File Discovery**:
+   - Traverse NotePlan directory structure
+   - Identify daily plan files (YYYY-MM-DD.md)
+   - Filter out system files (Caches, .DS_Store)
+   - Support recursive directory traversal
+
+2. **Markdown Parsing**:
+   - Parse markdown to extract structure
+   - Identify headers as Buckets
+   - Identify todos as Tasks
+   - Maintain header hierarchy (H1 → H2 → H3)
+   - Track task relationships to parent sections
+
+3. **Data Extraction**:
+   - Extract plan metadata (date, type)
+   - Extract bucket information (name, hierarchy level)
+   - Extract task information (title, status, completion)
+   - Preserve relationships between elements
+
+### Database Seeding
+1. **Plan Creation**:
+   - Create Plan records for daily plans
+   - Extract plan date from filename
+   - Support goal-focused plans
+
+2. **Bucket Creation**:
+   - Create Bucket records from markdown headers
+   - Maintain hierarchy relationships
+   - Preserve order and nesting
+
+3. **Task Creation**:
+   - Create Task records from markdown todos
+   - Link tasks to parent buckets
+   - Support tasks at plan root level
+   - Track completion status
+
+### Vector Store Seeding
+1. **Embedding Generation**:
+   - Generate embeddings for note file content
+   - Use appropriate embedding model
+   - Handle batch processing efficiently
+
+2. **Metadata Storage**:
+   - Store file path and name
+   - Store modification timestamp
+   - Store file size
+   - Enable search by metadata
+
+## Non-Functional Requirements
+
+### Performance
+- Query response time: < 6 seconds
+- Semantic search: < 500ms
+- Database queries: < 100ms
+- Embedding generation: Efficient batching
+
+### Scalability
+- Support thousands of note files
+- Handle concurrent queries
+- Efficient vector search at scale
+
+### Reliability
+- Graceful error handling
+- Service health monitoring
+- Automatic recovery from transient failures
+
+### Usability
+- Clear, natural language answers
+- Helpful error messages
+- Transparent source citations
+
+## Integration Requirements
+
+### NotePlan
+- Read from local NotePlan directory
+- Support macOS NotePlan file structure
+- Handle NotePlan-specific conventions
+
+### LLM Services
+- LiteLLM proxy for routing
+- LM Studio for local model execution
+- Support for multiple models (completion, embedding)
+
+### Database
+- PostgreSQL for structured data
+- Qdrant for vector embeddings
+- Proper connection pooling
+- Health checks
+
+## Future Enhancement Opportunities
+
+### Features
+- Conversation history and context
+- Query caching for common questions
+- Batch query processing
+- Note editing through API
+- Task management endpoints
+- Advanced filtering (by date, plan type, status)
+- Export functionality
+
+### Technical
+- Authentication and authorization
+- Rate limiting
+- Production LLM service integration
+- Advanced monitoring and alerting
+- Performance optimization
+- Cost tracking and optimization
+
+## Success Criteria
+
+The system is considered successful when:
+- ✅ Users can ask natural language questions about their notes
+- ✅ Answers are accurate and cite relevant source files
+- ✅ Semantic search finds relevant notes effectively
+- ✅ NotePlan files are correctly parsed and stored
+- ✅ System performs reliably under normal usage
+- ✅ Error handling provides clear feedback
+- ✅ System is maintainable and extensible

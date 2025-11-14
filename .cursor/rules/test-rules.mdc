@@ -1,0 +1,57 @@
+---
+alwaysApply: true
+---
+
+# Testing Rules
+
+## ❌ NEVER: Remove Test Functionality
+
+**Never remove or disable tests.** If a test fails, fix the code, not the test.
+
+**Bad:**
+```python
+# ❌ Don't remove tests
+# def test_important_feature():
+#     ...
+
+# ❌ Don't skip tests
+@pytest.mark.skip("Test is flaky")  # ❌
+def test_important_feature():
+    ...
+```
+
+**Good:**
+```python
+# ✅ Fix the code to make the test pass
+# ✅ Improve test if it's unclear or flaky
+# ✅ Add better assertions or test data
+def test_important_feature():
+    # Enhanced test with better setup
+    ...
+```
+
+**If a test doesn't make sense:**
+1. **First**: Consider if the code should be updated to match the test's intent
+2. **Then**: Enhance the test (better data, clearer assertions, more context)
+3. **Never**: Remove or skip the test without discussion
+
+## ✅ Testing After Changes
+
+**Always run integration tests after code changes** to verify functionality.
+
+**Quick validation:**
+```bash
+make test-note-query-validate  # Fast (10-30s) - use during development
+```
+
+**Full verification:**
+```bash
+make test-note-query-e2e-fast  # Comprehensive (1-2min) - before committing
+```
+
+**Debug specific test:**
+```bash
+make integration-test-one TEST="tst/integration/agents/test_note_query_agent.py"
+```
+
+**Reference:** See `DEVELOPMENT.md` section "Integration Test Commands" for full workflow.

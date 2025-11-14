@@ -1,0 +1,35 @@
+---
+alwaysApply: true
+---
+
+# Coding Rules
+
+## ❌ NEVER: Nested Imports
+
+**All imports must be at module level.** Nested imports indicate circular dependencies or poor organization.
+
+**Bad:**
+```python
+def my_function():
+    from ..config.api_config import Settings  # ❌
+    settings = get_settings()
+```
+
+**Good:**
+```python
+from typing import TYPE_CHECKING
+from ..utils.guardrail_settings import get_settings_for_guardrail
+
+if TYPE_CHECKING:
+    from ..config.api_config import Settings
+
+def my_function():
+    settings = get_settings_for_guardrail()  # ✅
+```
+
+**If you need nested imports:**
+1. Create a utility module (e.g., `utils/guardrail_settings.py`) with module-level imports
+2. Import and use the utility function
+
+**Reference:** See `src/knowledge_agents/utils/guardrail_settings.py` for example.
+

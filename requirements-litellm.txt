@@ -1,0 +1,15 @@
+# LiteLLM Proxy Dependencies
+# Minimal dependencies needed for LiteLLM proxy server
+
+# Core LiteLLM proxy server
+litellm[proxy]>=1.0.0
+
+# Prisma for database client (used by LiteLLM for storing API keys, usage, etc.)
+prisma>=0.11.0
+
+# YAML support for config file parsing
+pyyaml>=6.0
+
+# Environment variable support
+python-dotenv==1.0.0
+

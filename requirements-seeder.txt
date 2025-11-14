@@ -1,0 +1,14 @@
+# Seeder Dependencies
+# Base dependencies needed for seeding scripts
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+openai>=1.107.1
+qdrant-client>=1.7.0
+python-dotenv==1.0.0
+pydantic>=2.10.0
+pydantic-settings>=2.0.0
+
+# Seeder-specific dependencies
+markdown>=3.4.0
+beautifulsoup4>=4.12.0
+

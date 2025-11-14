@@ -1,0 +1,70 @@
+general_settings:
+  master_key: sk-1234
+  database_url: "postgresql://knowledge:knowledge123@postgres:5432/knowledge_workflow"
+
+litellm_settings:
+  drop_params: true  # Drop unsupported parameters (like encoding_format) for LM Studio models
+
+model_list:
+  # Qwen3 Coder 30B - Specialized coding model
+  # USE WHEN: Code generation, code completion, debugging, refactoring, code explanation
+  # Best for: Programming tasks, code reviews, technical documentation
+  - model_name: lm_studio/qwen3-coder-30b
+    litellm_params:
+      model: lm_studio/qwen/qwen3-coder-30b
+      mode: completion
+      # input_cost_per_token: 1
+      # output_cost_per_token: 1
+      api_base: ${LM_STUDIO_API_BASE}
+      api_key: "lm-studio"  # LM Studio doesn't require real API key
+  # Alias for when LiteLLM strips the "lm_studio/" prefix
+  - model_name: qwen3-coder-30b
+    litellm_params:
+      model: lm_studio/qwen/qwen3-coder-30b
+      mode: completion
+      # input_cost_per_token: 1
+      # output_cost_per_token: 1
+      api_base: ${LM_STUDIO_API_BASE}
+      api_key: "lm-studio"  # LM Studio doesn't require real API key
+
+  # GPT-OSS 20B - General purpose open-source model
+  # USE WHEN: General conversations, text generation, question answering, content creation
+  # Best for: Chat applications, text completion, general AI tasks
+  - model_name: lm_studio/gpt-oss-20b
+    litellm_params:
+      model: lm_studio/openai/gpt-oss-20b
+      mode: responses
+      # input_cost_per_token: 1
+      # output_cost_per_token: 1
+      api_base: ${LM_STUDIO_API_BASE}
+      api_key: "lm-studio"  # LM Studio doesn't require real API key
+
+  # Nomic Embed Text v1.5 - Embedding model
+  # USE WHEN: Generating embeddings for semantic search, similarity matching, clustering
+  # Best for: Vector databases, RAG systems, document similarity, search functionality
+  - model_name: lm_studio/text-embedding-nomic-embed-text-v1.5
+    litellm_params:
+      model: lm_studio/text-embedding-nomic-embed-text-v1.5
+      mode: embedding
+      # input_cost_per_token: 1
+      # output_cost_per_token: 1
+      api_base: ${LM_STUDIO_API_BASE}
+      api_key: "lm-studio"  # LM Studio doesn't require real API key
+
+  # Qwen3 Embedding 8B - Qwen-based embedding model
+  # USE WHEN: Generating embeddings for semantic search, similarity matching, clustering
+  # Best for: Vector databases, RAG systems, document similarity, multilingual embeddings
+  - model_name: lm_studio/text-embedding-qwen3-embedding-8b
+    litellm_params:
+      model: lm_studio/text-embedding-qwen3-embedding-8b
+      mode: embedding
+      # input_cost_per_token: 1
+      # output_cost_per_token: 1
+      api_base: ${LM_STUDIO_API_BASE}
+      api_key: "lm-studio"  # LM Studio doesn't require real API key
+
+router_settings:
+  routing_strategy: "simple-shuffle"
+  num_retries: 3
+  timeout: 300.0
+

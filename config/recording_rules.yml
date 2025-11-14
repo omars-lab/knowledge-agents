@@ -1,0 +1,57 @@
+groups:
+  - name: knowledge_agents_recording_rules
+    interval: 30s
+    rules:
+      # HTTP Request Rate
+      - record: knowledge_agents:http_requests_per_second
+        expr: rate(http_requests_total[1m])
+        labels:
+          service: "agentic-api"
+          
+      # Database Connection Success Rate
+      - record: knowledge_agents:db_connection_success_rate
+        expr: rate(database_connections_total{status="success"}[5m])
+        labels:
+          service: "agentic-api"
+          
+      # Database Connection Failure Rate  
+      - record: knowledge_agents:db_connection_failure_rate
+        expr: rate(database_connections_total{status="failure"}[5m])
+        labels:
+          service: "agentic-api"
+          
+      # Database Connection Duration (95th percentile)
+      - record: knowledge_agents:db_connection_duration_p95
+        expr: histogram_quantile(0.95, rate(database_connection_duration_seconds_bucket[5m]))
+        labels:
+          service: "agentic-api"
+          
+      # Service Health Status
+      - record: knowledge_agents:service_health
+        expr: up{job="agentic-api"}
+        labels:
+          service: "agentic-api"
+          
+      # Service Start Count
+      - record: knowledge_agents:service_starts_total
+        expr: service_starts_total
+        labels:
+          service: "agentic-api"
+          
+      # Workflow Analysis Success Rate
+      - record: knowledge_agents:workflow_analysis_success_rate
+        expr: rate(workflow_analysis_total{status="success"}[5m]) / rate(workflow_analysis_total[5m])
+        labels:
+          service: "agentic-api"
+          
+      # Guardrail Trip Rate
+      - record: knowledge_agents:guardrail_trip_rate
+        expr: rate(guardrails_trip_total[5m])
+        labels:
+          service: "agentic-api"
+          
+      # Guardrail Failure Rate
+      - record: knowledge_agents:guardrail_failure_rate
+        expr: rate(guardrails_total{result="failed"}[5m]) / rate(guardrails_total[5m])
+        labels:
+          service: "agentic-api"

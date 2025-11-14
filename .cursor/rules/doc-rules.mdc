@@ -1,0 +1,46 @@
+---
+alwaysApply: true
+---
+
+# Documentation Rules
+
+## ✅ Read Docs Before Making Changes
+
+**Always consult `DEVELOPMENT.md` for context** before making structural changes:
+
+- **Architecture patterns**: Dependency layers, injection patterns
+- **Testing workflows**: Integration test commands, fixture patterns
+- **Code organization**: Module structure, import rules
+- **Development workflow**: Build commands, Docker setup
+
+**Quick reference:**
+```bash
+# Key sections in DEVELOPMENT.md:
+# - "Dependency Layers" - Architecture patterns
+# - "Integration Test Commands" - Testing workflows  
+# - "Development Workflow" - Build/test commands
+```
+
+## ✅ Update Docs for Structural Changes
+
+**Update documentation when making big/structural changes:**
+
+**Must update:**
+- `DEVELOPMENT.md` - Architecture changes, new patterns, workflow changes
+- `README.md` - Setup instructions, project overview changes
+- `docs/*.md` - Specific implementation docs if patterns change
+
+**Examples of structural changes:**
+- Adding new dependency layers or services
+- Changing import/architecture patterns
+- Modifying test fixtures or workflows
+- Adding new build/test commands
+- Changing Docker/service configuration
+
+**Update checklist:**
+- [ ] Architecture diagrams/explanations still accurate
+- [ ] Code examples match current patterns
+- [ ] Test commands still work
+- [ ] Setup instructions still valid
+
+**Reference:** See `DEVELOPMENT.md` for current patterns and `docs/` for detailed implementation docs.
