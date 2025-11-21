@@ -1,6 +1,36 @@
 """Prometheus metrics for the Agentic API."""
 
-from prometheus_client import REGISTRY, Counter, Histogram, generate_latest
+try:
+    from prometheus_client import REGISTRY, Counter, Histogram, generate_latest
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    # Prometheus not available (e.g., in seeder/graph-builder containers)
+    PROMETHEUS_AVAILABLE = False
+    # Create no-op classes
+    class REGISTRY:
+        _collector_to_names = {}
+        @staticmethod
+        def unregister(*args, **kwargs):
+            pass
+    
+    class Counter:
+        def __init__(self, *args, **kwargs):
+            pass
+        def labels(self, **kwargs):
+            return self
+        def inc(self, *args, **kwargs):
+            pass
+    
+    class Histogram:
+        def __init__(self, *args, **kwargs):
+            pass
+        def labels(self, **kwargs):
+            return self
+        def observe(self, *args, **kwargs):
+            pass
+    
+    def generate_latest():
+        return b""
 
 
 class Metrics:
@@ -18,6 +48,11 @@ class Metrics:
         if self._initialized:
             return
         self._initialized = True
+
+        # If prometheus is not available, create no-op metrics
+        if not PROMETHEUS_AVAILABLE:
+            self._create_noop_metrics()
+            return
 
         # Clear any existing metrics to avoid duplication
         try:
@@ -229,8 +264,89 @@ class Metrics:
             "memory_usage_bytes", "Memory usage in bytes"
         )
 
+    def _create_noop_metrics(self):
+        """Create no-op metric objects when prometheus is not available."""
+        # Create no-op metric objects that have the same interface
+        class NoOpMetric:
+            def labels(self, **kwargs):
+                return self
+            def inc(self, *args, **kwargs):
+                pass
+            def observe(self, *args, **kwargs):
+                pass
+        
+        noop = NoOpMetric()
+        
+        # Database metrics
+        self.db_connections_total = noop
+        self.db_connection_duration = noop
+        
+        # Service metrics
+        self.service_starts_total = noop
+        
+        # HTTP metrics
+        self.http_requests_total = noop
+        self.http_request_duration = noop
+        
+        # Workflow Analysis metrics
+        self.workflow_analysis_total = noop
+        self.workflow_analysis_duration = noop
+        self.workflow_analysis_input_tokens = noop
+        self.workflow_analysis_output_tokens = noop
+        self.workflow_analysis_cost_usd = noop
+        self.workflow_analysis_apps_found = noop
+        self.workflow_analysis_actions_found = noop
+        
+        # Guardrails metrics
+        self.guardrails_total = noop
+        self.guardrails_trip_total = noop
+        self.guardrails_tripped_per_request = noop
+        self.guardrails_tripped_total = noop
+        self.guardrails_processing_duration = noop
+        
+        # Judge agent metrics
+        self.judge_evaluations_total = noop
+        self.judge_score_distribution = noop
+        self.judge_processing_duration = noop
+        self.judge_accuracy_total = noop
+        
+        # Quality metrics
+        self.quality_score_distribution = noop
+        self.quality_improvement_total = noop
+        self.workflow_quality_score = noop
+        
+        # Business Critical Metrics
+        self.guardrail_success_total = noop
+        self.guardrail_failure_total = noop
+        self.workflow_detection_total = noop
+        
+        # OpenAI API Usage Metrics
+        self.openai_api_calls_total = noop
+        self.openai_api_duration = noop
+        self.openai_tokens_used = noop
+        self.openai_cost_total = noop
+        self.openai_rate_limits_total = noop
+        
+        # Request Success Metrics
+        self.request_success_total = noop
+        self.request_error_total = noop
+        self.end_to_end_duration = noop
+        
+        # AI Agent Performance Metrics
+        self.ai_agent_consistency = noop
+        self.ai_agent_quality_score = noop
+        self.ai_agent_processing_time = noop
+        
+        # System Health Metrics
+        self.system_health_score = noop
+        self.concurrent_requests = noop
+        self.memory_usage_bytes = noop
+
     def generate_metrics(self) -> str:
         """Generate Prometheus metrics output."""
+        if not PROMETHEUS_AVAILABLE:
+            return ""
+        
         # Ensure all metrics are initialized by calling them once
         self.db_connections_total.labels(status="success")
         self.db_connections_total.labels(status="error")

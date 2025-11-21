@@ -1,0 +1,39 @@
+# Graph Builder Dependencies
+# Dependencies for Neo4j graph building service
+
+# Core dependencies
+python-dotenv>=1.0.0
+openai>=1.107.1
+tiktoken>=0.7.0
+
+# LangChain ecosystem (latest compatible versions)
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-community>=0.0.20
+
+# Sentence transformers for embeddings
+sentence-transformers>=2.2.0
+
+# Graph Data Science
+graphdatascience>=1.0.0
+
+# Visualization
+altair>=5.0.0
+vegafusion[embed]>=1.0.0
+
+# UI/Visualization
+gradio>=4.0.0
+
+# Neo4j driver
+neo4j>=5.15.0
+
+# Agents framework (needed for graph builder agent)
+openai-agents==0.5.1
+openai-agents[litellm]==0.5.1
+litellm[proxy]>=1.0.0
+
+# Pydantic for data validation
+pydantic>=2.10.0
+pydantic-settings>=2.0.0
+typing-extensions>=4.2.0
+

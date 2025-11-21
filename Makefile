@@ -13,7 +13,7 @@
 #   All health check and helper logic has been moved to scripts/makefile-helper.sh
 #   This script contains reusable functions for complex Makefile operations.
 
-.PHONY: help start build test clean format lint type-check docker-up docker-down litellm litellm-embedding litellm-code tidy-mcp-up tidy-mcp-down tidy-mcp-restart tidy-mcp-logs tidy-mcp-test test-tools
+.PHONY: help start build test clean format lint type-check docker-up docker-down litellm litellm-embedding litellm-code tidy-mcp-up tidy-mcp-down tidy-mcp-restart tidy-mcp-logs tidy-mcp-test test-tools neo4j-seed-vector neo4j-seed-graph neo4j-build-graph neo4j-query neo4j-graph-builder-up neo4j-graph-builder-down neo4j-graph-builder-restart neo4j-graph-builder-logs
 
 # =============================================================================
 # MAIN TARGETS
@@ -149,6 +149,60 @@ db-seed-vector-store: wait-for-services ## Seeding vector database from NotePlan
 	@echo "✅ Vector database seeded successfully"
 
 db-seed: wait-for-services db-seed-database db-seed-vector-store ## Re-seed PostgreSQL container with Plans/Buckets/Tasks and vector database from NotePlan files
+
+# =============================================================================
+# NEO4J TARGETS
+# =============================================================================
+
+neo4j-seed-vector: wait-for-services ## Seed Neo4j vector store with note embeddings
+	@echo "🔄 Seeding Neo4j vector store with note embeddings..."
+	@docker compose run --rm -v $(PWD)/build:/app/build seeder python scripts/seed_neo4j_vector_store.py
+	@echo "✅ Neo4j vector store seeded successfully"
+
+neo4j-seed-graph: wait-for-services ## Seed Neo4j graph database with entities and relationships
+	@echo "🔄 Seeding Neo4j graph database with entities and relationships..."
+	@docker compose run --rm -v $(PWD)/build:/app/build seeder python scripts/seed_graph_database.py
+	@echo "✅ Neo4j graph database seeded successfully"
+
+neo4j-build-graph: wait-for-services ## Build Neo4j knowledge graph from notes (continuous builder)
+	@echo "🔄 Building Neo4j knowledge graph from notes..."
+	@docker compose run --rm -v $(PWD)/build:/app/build seeder python scripts/build_neo4j_graph.py
+	@echo "✅ Neo4j knowledge graph built successfully"
+
+neo4j-query: ## Query Neo4j graph interactively (usage: make neo4j-query QUERY="your question")
+	@if [ -z "$(QUERY)" ]; then \
+		echo "🔍 Starting interactive Neo4j graph query mode..."; \
+		docker compose run --rm -v $(PWD)/build:/app/build seeder python scripts/query_neo4j_graph.py; \
+	else \
+		echo "🔍 Querying Neo4j graph: $(QUERY)"; \
+		docker compose run --rm -v $(PWD)/build:/app/build seeder python scripts/query_neo4j_graph.py --question "$(QUERY)"; \
+	fi
+
+neo4j-graph-builder-up: ## Start Neo4j graph builder service
+	@echo "🚀 Starting Neo4j graph builder service..."
+	@docker compose up -d --build neo4j-graph-builder
+	@echo "⏳ Waiting for Neo4j graph builder to start..."
+	@sleep 5
+	@echo "✅ Neo4j graph builder service started!"
+	@echo "📋 View logs with: make neo4j-graph-builder-logs"
+
+neo4j-graph-builder-down: ## Stop Neo4j graph builder service
+	@echo "🛑 Stopping Neo4j graph builder service..."
+	@docker compose stop neo4j-graph-builder
+	@echo "✅ Neo4j graph builder service stopped!"
+
+neo4j-graph-builder-restart: ## Restart Neo4j graph builder service
+	@echo "🔄 Restarting Neo4j graph builder service..."
+	@docker compose restart neo4j-graph-builder
+	@echo "⏳ Waiting for Neo4j graph builder to restart..."
+	@sleep 5
+	@echo "✅ Neo4j graph builder service restarted!"
+
+neo4j-graph-builder-logs: ## View Neo4j graph builder service logs
+	@docker compose logs -f neo4j-graph-builder
+
+neo4j-setup: wait-for-services neo4j-seed-vector neo4j-seed-graph ## Complete Neo4j setup (seed vector store + seed graph database)
+	@echo "✅ Neo4j setup completed!"
 
 db-reset: ## Reset PostgreSQL database completely (destroys all data)
 	@echo "⚠️  Resetting PostgreSQL database (this will destroy all data)..."
@@ -354,7 +408,7 @@ test-tools: ## Run integration tests for tools (tidy-mcp, NotePlan tools)
 	@echo "🧪 Running tools integration tests..."
 	@if ! $(PWD)/scripts/makefile-helper.sh check_service_health tidy-mcp 2>/dev/null; then \
 		echo "⚠️  tidy-mcp service not running. Starting it..."; \
-		make tidy-mcp-up; \
+		make tidy-mcxp-up; \
 	fi
 	@echo "⏳ Waiting for tidy-mcp to be healthy..."
 	@$(PWD)/scripts/makefile-helper.sh check_service_health tidy-mcp --wait --timeout 30 || true

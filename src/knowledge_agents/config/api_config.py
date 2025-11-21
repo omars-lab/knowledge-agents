@@ -133,6 +133,25 @@ class Settings(BaseSettings):
         "When enabled, includes input/output/total tokens in response headers and enables include_usage in ModelSettings.",
     )
 
+    # Neo4j Configuration
+    neo4j_uri: str = Field(
+        default="bolt://host.docker.internal:7687",
+        description="Neo4j database URI (for Neo4j Desktop, typically bolt://localhost:7687)",
+    )
+    neo4j_username: str = Field(
+        default="neo4j", description="Neo4j username"
+    )
+    neo4j_password: str = Field(
+        default="admin123", description="Neo4j password"
+    )
+    neo4j_database: str = Field(
+        default="knowledge", description="Neo4j database name"
+    )
+    neo4j_vector_index_name: str = Field(
+        default="note_embeddings",
+        description="Neo4j vector index name for note embeddings",
+    )
+
     def __init__(self, **kwargs):
         # Allow overriding openai_api_key via kwargs (useful for tests)
         openai_api_key_override = kwargs.pop("openai_api_key", None)

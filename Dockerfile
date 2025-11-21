@@ -118,3 +118,15 @@ RUN pip install --no-cache-dir -r requirements-seeder.txt
 COPY src/ ./src/
 COPY scripts/ ./scripts/
 COPY data/ ./data/
+
+# Graph Builder stage - for Neo4j graph building service
+FROM base as graph-builder
+
+# Copy graph-builder-specific requirements and install dependencies
+COPY requirements-graph-builder.txt .
+RUN pip install --no-cache-dir -r requirements-graph-builder.txt
+
+# Copy application code needed for graph building
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY data/ ./data/

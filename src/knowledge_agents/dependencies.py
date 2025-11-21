@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from .clients.openai import OpenAIClientManager
     from .clients.proxy_client import ProxyClientManager
     from .clients.vector_store import VectorStoreClientManager
+    from .clients.neo4j_client import Neo4jClientManager
     from .config.api_config import Settings
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class Dependencies:
         from .clients.openai import OpenAIClientManager
         from .clients.proxy_client import ProxyClientManager
         from .clients.vector_store import VectorStoreClientManager
+        from .clients.neo4j_client import Neo4jClientManager
 
         self._proxy_client_manager: ProxyClientManager = ProxyClientManager(
             settings=settings, api_key=self.api_key
@@ -62,6 +64,9 @@ class Dependencies:
         )
         self._openai_client_manager: OpenAIClientManager = OpenAIClientManager(
             settings=settings, api_key=self.api_key
+        )
+        self._neo4j_client_manager: Neo4jClientManager = Neo4jClientManager(
+            settings=settings
         )
 
     @property
@@ -83,6 +88,11 @@ class Dependencies:
     def openai_client(self) -> AsyncOpenAI:
         """Get the OpenAI async client."""
         return self.openai_client_manager.get_client()
+
+    @property
+    def neo4j_client_manager(self) -> Neo4jClientManager:
+        """Get the Neo4j client manager."""
+        return self._neo4j_client_manager
 
 
 # Global dependency container - initialized at app startup

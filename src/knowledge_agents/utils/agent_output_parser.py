@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 def extract_structured_output(
     result: "RunResult", output_type: type
-) -> tuple["NoteQueryAgentOutput", str]:
+) -> tuple[any, str]:
     """
     Extract structured output from agent RunResult.
 
@@ -33,7 +33,7 @@ def extract_structured_output(
     Returns:
         Tuple of (structured_output, answer_text)
     """
-    structured_output: "NoteQueryAgentOutput" | None = None
+    structured_output: any | None = None
     answer_text = ""
 
     # Log what we're working with for debugging
@@ -167,29 +167,41 @@ def extract_structured_output(
     # Create default structured output if not found
     if structured_output is None:
         logger.warning("⚠️ Creating default structured output - agent did not return structured format")
-        # Use a clean reasoning message instead of the RunResult string
-        if answer_text and "RunResult:" in answer_text:
-            # Extract meaningful content from RunResult string if possible
-            reasoning = "Answer generated from relevant notes."
-            # Try to find actual content in the RunResult string
-            if "Final output" in answer_text:
-                parts = answer_text.split("Final output")
-                if len(parts) > 1:
-                    content = parts[1].strip()
-                    if content and not content.startswith("(str):"):
-                        reasoning = content
+        # Try to create default output based on output_type
+        # Check if it's NoteQueryAgentOutput (has specific fields)
+        if hasattr(output_type, "__name__") and "NoteQueryAgentOutput" in output_type.__name__:
+            # Use a clean reasoning message instead of the RunResult string
+            if answer_text and "RunResult:" in answer_text:
+                # Extract meaningful content from RunResult string if possible
+                reasoning = "Answer generated from relevant notes."
+                # Try to find actual content in the RunResult string
+                if "Final output" in answer_text:
+                    parts = answer_text.split("Final output")
+                    if len(parts) > 1:
+                        content = parts[1].strip()
+                        if content and not content.startswith("(str):"):
+                            reasoning = content
+            else:
+                reasoning = answer_text if answer_text else "Answer generated from relevant notes."
+            
+            structured_output = output_type(
+                reasoning=reasoning,
+                relevant_note_files=[],
+                relevant_daily_files=[],
+                noteplan_links=[],
+            )
+            # Clear answer_text if it's just the RunResult string
+            if answer_text and "RunResult:" in answer_text:
+                answer_text = reasoning
         else:
-            reasoning = answer_text if answer_text else "Answer generated from relevant notes."
-        
-        structured_output = output_type(
-            reasoning=reasoning,
-            relevant_note_files=[],
-            relevant_daily_files=[],
-            noteplan_links=[],
-        )
-        # Clear answer_text if it's just the RunResult string
-        if answer_text and "RunResult:" in answer_text:
-            answer_text = reasoning
+            # For other output types, try to create with empty/default values
+            try:
+                # Try to create with empty dict (Pydantic will use defaults)
+                structured_output = output_type()
+            except Exception as e:
+                logger.error(f"Could not create default {output_type.__name__}: {e}")
+                # Last resort: return None and let caller handle it
+                structured_output = None
 
     return structured_output, answer_text
 
