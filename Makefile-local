@@ -1,0 +1,156 @@
+# Makefile-local: Local development targets using Conda
+# This Makefile is for local development with conda environments
+# It is separate from the main Makefile which focuses on Docker-based workflows
+
+.PHONY: help conda-setup conda-remove conda-activate conda-install conda-update \
+	run-seed-database run-seed-vector-store run-seed-neo4j-vector run-seed-graph \
+	run-build-graph run-query-graph conda-info jupyter jupyter-stop
+
+CONDA_ENV_NAME := knowledge-agents
+PYTHON_VERSION := 3.11
+
+help: ## Show this help message
+	@echo "Conda Environment Management:"
+	@echo "  make conda-setup      - Create conda environment and install all dependencies"
+	@echo "  make conda-install    - Install/update dependencies in existing environment"
+	@echo "  make conda-remove     - Remove conda environment"
+	@echo "  make conda-activate   - Show command to activate environment"
+	@echo "  make conda-info       - Show conda environment information"
+	@echo ""
+	@echo "Run Scripts Locally (using conda run):"
+	@echo "  make run-seed-database        - Run database seeding script"
+	@echo "  make run-seed-vector-store    - Run Qdrant vector store seeding"
+	@echo "  make run-seed-neo4j-vector    - Run Neo4j vector store seeding"
+	@echo "  make run-seed-graph           - Run Neo4j graph database seeding"
+	@echo "  make run-build-graph          - Run Neo4j graph builder"
+	@echo "  make run-query-graph         - Run Neo4j graph query script"
+	@echo ""
+	@echo "Jupyter Notebooks:"
+	@echo "  make jupyter                 - Start Jupyter Lab server for notebooks directory"
+	@echo "  make jupyter-stop            - Stop Jupyter Lab server"
+	@echo ""
+	@echo "Note: Most scripts require environment variables and services to be running."
+	@echo "See README.md or DEVELOPMENT.md for setup instructions."
+
+conda-setup: ## Create conda environment and install all dependencies
+	@echo "🔧 Setting up conda environment: $(CONDA_ENV_NAME)"
+	@if conda env list | grep -q "^$(CONDA_ENV_NAME) "; then \
+		echo "⚠️  Environment $(CONDA_ENV_NAME) already exists. Use 'make conda-install' to update, or 'make conda-remove' to remove first."; \
+		exit 1; \
+	fi
+	@echo "📦 Creating conda environment with Python $(PYTHON_VERSION)..."
+	conda create -n $(CONDA_ENV_NAME) python=$(PYTHON_VERSION) -y
+	@echo "📥 Installing conda-specific requirements (Jupyter, etc.)..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-conda.txt
+	@echo "📥 Installing base requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements.txt
+	@echo "📥 Installing development requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-dev.txt
+	@echo "📥 Installing graph builder requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-graph-builder.txt
+	@echo "📥 Installing seeder requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-seeder.txt
+	@echo "📥 Installing LiteLLM requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-litellm.txt
+	@echo "📦 Installing repository in editable mode..."
+	conda run -n $(CONDA_ENV_NAME) pip install -e .
+	@echo "✅ Conda environment setup complete!"
+	@echo ""
+	@echo "To activate the environment, run:"
+	@echo "  conda activate $(CONDA_ENV_NAME)"
+	@echo ""
+	@echo "Or use 'make conda-activate' to see the command."
+
+conda-install: ## Install/update dependencies in existing environment
+	@echo "📥 Updating dependencies in conda environment: $(CONDA_ENV_NAME)"
+	@if ! conda env list | grep -q "^$(CONDA_ENV_NAME) "; then \
+		echo "❌ Environment $(CONDA_ENV_NAME) does not exist. Use 'make conda-setup' to create it."; \
+		exit 1; \
+	fi
+	@echo "📥 Installing conda-specific requirements (Jupyter, etc.)..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-conda.txt
+	@echo "📥 Installing base requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements.txt
+	@echo "📥 Installing development requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-dev.txt
+	@echo "📥 Installing graph builder requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-graph-builder.txt
+	@echo "📥 Installing seeder requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-seeder.txt
+	@echo "📥 Installing LiteLLM requirements..."
+	conda run -n $(CONDA_ENV_NAME) pip install -r requirements-litellm.txt
+	@echo "📦 Installing repository in editable mode..."
+	conda run -n $(CONDA_ENV_NAME) pip install -e .
+	@echo "✅ Dependencies updated!"
+
+conda-remove: ## Remove conda environment
+	@echo "🗑️  Removing conda environment: $(CONDA_ENV_NAME)"
+	@if ! conda env list | grep -q "^$(CONDA_ENV_NAME) "; then \
+		echo "⚠️  Environment $(CONDA_ENV_NAME) does not exist."; \
+		exit 0; \
+	fi
+	conda env remove -n $(CONDA_ENV_NAME) -y
+	@echo "✅ Environment removed!"
+
+conda-activate: ## Show command to activate environment
+	@echo "To activate the conda environment, run:"
+	@echo "  conda activate $(CONDA_ENV_NAME)"
+	@echo ""
+	@echo "Or use 'conda run -n $(CONDA_ENV_NAME) <command>' to run commands in the environment."
+
+conda-info: ## Show conda environment information
+	@echo "📊 Conda Environment Information:"
+	@echo "  Environment name: $(CONDA_ENV_NAME)"
+	@echo "  Python version: $(PYTHON_VERSION)"
+	@echo ""
+	@if conda env list | grep -q "^$(CONDA_ENV_NAME) "; then \
+		echo "✅ Environment exists"; \
+		conda env list | grep "^$(CONDA_ENV_NAME) "; \
+		echo ""; \
+		echo "Installed packages:"; \
+		conda run -n $(CONDA_ENV_NAME) pip list | head -20; \
+	else \
+		echo "❌ Environment does not exist. Run 'make conda-setup' to create it."; \
+	fi
+
+# Script execution targets
+# These targets run scripts using conda run to ensure they use the correct environment
+
+run-seed-database: ## Run database seeding script
+	@echo "🌱 Running database seeding script..."
+	conda run -n $(CONDA_ENV_NAME) python scripts/seed_database.py
+
+run-seed-vector-store: ## Run Qdrant vector store seeding script
+	@echo "🌱 Running Qdrant vector store seeding script..."
+	conda run -n $(CONDA_ENV_NAME) python scripts/seed_vector_store.py
+
+run-seed-neo4j-vector: ## Run Neo4j vector store seeding script
+	@echo "🌱 Running Neo4j vector store seeding script..."
+	conda run -n $(CONDA_ENV_NAME) python scripts/seed_neo4j_vector_store.py
+
+run-seed-graph: ## Run Neo4j graph database seeding script
+	@echo "🌱 Running Neo4j graph database seeding script..."
+	conda run -n $(CONDA_ENV_NAME) python scripts/seed_graph_database.py
+
+run-build-graph: ## Run Neo4j graph builder script
+	@echo "🔨 Running Neo4j graph builder script..."
+	conda run -n $(CONDA_ENV_NAME) python scripts/build_neo4j_graph.py
+
+run-query-graph: ## Run Neo4j graph query script
+	@echo "🔍 Running Neo4j graph query script..."
+	conda run -n $(CONDA_ENV_NAME) python scripts/query_neo4j_graph.py
+
+jupyter: ## Start Jupyter Lab server for notebooks directory
+	@echo "📓 Starting Jupyter Lab server..."
+	@echo "   Notebooks will be available at: http://localhost:8888"
+	@echo "   Press Ctrl+C to stop the server"
+	@if ! conda env list | grep -q "^$(CONDA_ENV_NAME) "; then \
+		echo "❌ Environment $(CONDA_ENV_NAME) does not exist. Run 'make conda-setup' first."; \
+		exit 1; \
+	fi
+	conda run -n $(CONDA_ENV_NAME) jupyter lab --notebook-dir=notebooks --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+
+jupyter-stop: ## Stop Jupyter Lab server (if running)
+	@echo "🛑 Stopping Jupyter Lab server..."
+	@pkill -f "jupyter lab" || echo "No Jupyter server found running"
+

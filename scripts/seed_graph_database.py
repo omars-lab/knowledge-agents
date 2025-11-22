@@ -26,9 +26,12 @@ from knowledge_agents.config.api_config import Settings
 from knowledge_agents.config.logging_config import setup_logging
 from knowledge_agents.dependencies import Dependencies
 from knowledge_agents.clients.neo4j_client import Neo4jClientManager
-from knowledge_agents.agents.graph_builder_agent import run_graph_builder_agent
+from knowledge_agents.utils.graph_utils import (
+    setup_graph_schema,
+    create_graph_nodes_and_relationships,
+    extract_from_note_file,
+)
 from notes.filter import should_skip_file
-from notes.parser import read_noteplan_file
 from notes.traversal import get_files_from_last_month
 
 # Neo4j imports
@@ -42,158 +45,8 @@ logger = logging.getLogger(__name__)
 NOTEPLAN_DIR = Path("/noteplan")
 
 
-def setup_graph_schema(driver: GraphDatabase.driver, database: str = "neo4j") -> None:
-    """
-    Set up Neo4j graph schema: indexes and constraints.
-    
-    Args:
-        driver: Neo4j driver
-        database: Neo4j database name
-    """
-    logger.info("Setting up Neo4j graph schema (indexes and constraints)...")
-    
-    with driver.session(database=database) as session:
-        # Create constraints for uniqueness
-        constraints = [
-            # Note nodes should have unique file_path
-            "CREATE CONSTRAINT note_file_path IF NOT EXISTS FOR (n:Note) REQUIRE n.file_path IS UNIQUE",
-            # Entity nodes should have unique name
-            "CREATE CONSTRAINT entity_name IF NOT EXISTS FOR (e:Entity) REQUIRE e.name IS UNIQUE",
-        ]
-        
-        for constraint in constraints:
-            try:
-                session.run(constraint)
-                logger.debug(f"Created constraint: {constraint.split()[2]}")
-            except Exception as e:
-                # Constraint might already exist
-                logger.debug(f"Constraint may already exist: {e}")
-        
-        # Create indexes for better query performance
-        indexes = [
-            # Index on Note file_path (already unique via constraint, but explicit index helps)
-            "CREATE INDEX note_file_path_idx IF NOT EXISTS FOR (n:Note) ON (n.file_path)",
-            # Index on Entity name (already unique via constraint, but explicit index helps)
-            "CREATE INDEX entity_name_idx IF NOT EXISTS FOR (e:Entity) ON (e.name)",
-            # Index on Entity type for filtering
-            "CREATE INDEX entity_type_idx IF NOT EXISTS FOR (e:Entity) ON (e.type)",
-            # Index on Note last_processed for tracking updates
-            "CREATE INDEX note_last_processed_idx IF NOT EXISTS FOR (n:Note) ON (n.last_processed)",
-        ]
-        
-        for index in indexes:
-            try:
-                session.run(index)
-                logger.debug(f"Created index: {index.split()[2]}")
-            except Exception as e:
-                # Index might already exist
-                logger.debug(f"Index may already exist: {e}")
-        
-        logger.info("✅ Graph schema setup completed")
-
-
-def create_graph_nodes_and_relationships(
-    driver: GraphDatabase.driver,
-    file_path: str,
-    agent_output,  # GraphBuilderAgentOutput
-    database: str = "neo4j",
-) -> tuple[int, int]:
-    """
-    Create nodes and relationships in Neo4j from agent output.
-    
-    Args:
-        driver: Neo4j driver
-        file_path: Path to the note file
-        agent_output: GraphBuilderAgentOutput with extracted entities and relationships
-        database: Neo4j database name
-        
-    Returns:
-        Tuple of (entities_created, relationships_created)
-    """
-    entities_created = 0
-    relationships_created = 0
-    
-    with driver.session(database=database) as session:
-        # Create Note node first
-        session.run(
-            """
-            MERGE (n:Note {file_path: $file_path})
-            SET n.last_processed = datetime()
-            """,
-            file_path=file_path,
-        )
-        
-        # Create entity nodes
-        for entity in agent_output.entities:
-            entity_name = entity.name
-            entity_type = entity.type
-            properties = entity.properties or {}
-            
-            if not entity_name:
-                continue
-            
-            # Create entity node (use Entity as base label, add type as property)
-            # This avoids creating too many node types
-            result = session.run(
-                """
-                MERGE (e:Entity {name: $name})
-                ON CREATE SET e.type = $entity_type, e += $properties
-                ON MATCH SET e.type = $entity_type, e += $properties
-                WITH e
-                MATCH (n:Note {file_path: $file_path})
-                MERGE (n)-[:CONTAINS]->(e)
-                RETURN e
-                """,
-                name=entity_name,
-                entity_type=entity_type,
-                properties=properties,
-                file_path=file_path,
-            )
-            
-            # Check if entity was created (ON CREATE) or matched (ON MATCH)
-            record = result.single()
-            if record:
-                entities_created += 1
-        
-        # Create relationships between entities
-        for rel in agent_output.relationships:
-            from_entity = rel.from_entity
-            to_entity = rel.to_entity
-            rel_type = rel.type
-            properties = rel.properties or {}
-            
-            if not from_entity or not to_entity:
-                continue
-            
-            # Use parameterized relationship type (safer, but requires dynamic query construction)
-            # For now, validate relationship type to prevent injection
-            valid_rel_types = [
-                "RELATED_TO", "WORKS_ON", "MENTIONS", "REFERENCES",
-                "OCCURS_AT", "BELONGS_TO", "PART_OF", "CONTAINS"
-            ]
-            if rel_type not in valid_rel_types:
-                logger.warning(f"Invalid relationship type: {rel_type}, using RELATED_TO")
-                rel_type = "RELATED_TO"
-            
-            result = session.run(
-                f"""
-                MATCH (from:Entity {{name: $from_name}})
-                MATCH (to:Entity {{name: $to_name}})
-                MERGE (from)-[r:{rel_type}]->(to)
-                ON CREATE SET r += $properties
-                ON MATCH SET r += $properties
-                RETURN r
-                """,
-                from_name=from_entity,
-                to_name=to_entity,
-                properties=properties,
-            )
-            
-            record = result.single()
-            if record:
-                relationships_created += 1
-    
-    return entities_created, relationships_created
+# Functions setup_graph_schema and create_graph_nodes_and_relationships
+# are now imported from knowledge_agents.utils.graph_utils
 
 
 async def process_note_file(
@@ -204,6 +57,9 @@ async def process_note_file(
     """
     Process a single note file and update the graph.
     
+    Uses `extract_from_note_file()` from graph_utils to extract data,
+    then stores it in Neo4j using `create_graph_nodes_and_relationships()`.
+    
     Args:
         file_path: Path to note file
         dependencies: Dependencies container
@@ -213,17 +69,19 @@ async def process_note_file(
         Tuple of (entities_created, relationships_created)
     """
     try:
-        content = read_noteplan_file(file_path)
         relative_path = str(file_path.relative_to(NOTEPLAN_DIR))
-        
         logger.info(f"Processing note: {relative_path}")
         
-        # Extract entities and relationships using graph builder agent
-        agent_output = await run_graph_builder_agent(
-            note_content=content,
-            file_path=relative_path,
+        # Extract entities and relationships using utility function
+        path, agent_output = await extract_from_note_file(
+            file_path=file_path,
+            relative_path=relative_path,
             dependencies=dependencies,
         )
+        
+        if agent_output is None:
+            logger.warning(f"Failed to extract data from {relative_path}")
+            return 0, 0
         
         # Deduplicate entities (same name and type)
         seen_entities = {}
@@ -245,7 +103,7 @@ async def process_note_file(
                 deduplicated_relationships.append(rel)
         agent_output.relationships = deduplicated_relationships
         
-        # Create graph nodes and relationships
+        # Create graph nodes and relationships using utility function
         entities_created, relationships_created = create_graph_nodes_and_relationships(
             driver=driver,
             file_path=relative_path,

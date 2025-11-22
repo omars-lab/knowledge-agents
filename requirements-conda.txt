@@ -1,0 +1,26 @@
+# Conda Environment Requirements
+# This file contains packages that are best installed via conda or are required for Jupyter notebooks
+
+# Jupyter ecosystem
+jupyter>=1.0.0
+jupyterlab>=4.0.0
+ipykernel>=6.25.0
+notebook>=7.0.0
+ipywidgets>=8.1.0
+
+# Jupyter extensions and tools
+jupyterlab-git>=0.45.0
+jupyterlab-widgets>=3.0.0
+
+# Data science and visualization (useful for notebooks)
+matplotlib>=3.8.0
+seaborn>=0.13.0
+pandas>=2.1.0
+numpy>=1.26.0
+
+# Optional: Jupyter notebook extensions
+jupyter-contrib-nbextensions>=0.7.0
+
+# Async support for Jupyter notebooks
+nest-asyncio>=1.5.0
+
