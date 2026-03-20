@@ -28,7 +28,7 @@ from knowledge_agents.utils.graph_utils import (
     store_notes_with_embeddings,
 )
 from knowledge_agents.utils.vector_store_utils import generate_embeddings
-from notes.traversal import get_files_from_last_month
+from knowledge_agents.notes.traversal import get_files_from_last_month
 
 # Neo4j imports
 from neo4j import GraphDatabase

@@ -28,8 +28,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from knowledge_agents.config.api_config import Settings
 from knowledge_agents.config.logging_config import setup_logging
 from knowledge_agents.database.models import Bucket, Plan, Task
-from notes.parser import parse_markdown_to_structure, read_noteplan_file
-from notes.traversal import get_daily_plan_files
+from knowledge_agents.notes.parser import parse_markdown_to_structure, read_noteplan_file
+from knowledge_agents.notes.traversal import get_daily_plan_files
 
 # Configure logging using centralized config
 setup_logging()

@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from notes.noteplan_structure import is_daily_plan_file
+from ..notes.noteplan_structure import is_daily_plan_file
 
 from ..types.note import NoteFileResult, NoteQueryAgentOutput
 

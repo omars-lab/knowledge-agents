@@ -16,8 +16,8 @@ from knowledge_agents.dependencies import Dependencies
 from knowledge_agents.utils.vector_store_utils import generate_embeddings
 
 # Import get_settings inside fixtures to avoid import-time issues with monkey-patching
-from notes.parser import read_noteplan_file
-from notes.traversal import get_files_from_last_month
+from knowledge_agents.notes.parser import read_noteplan_file
+from knowledge_agents.notes.traversal import get_files_from_last_month
 
 logger = logging.getLogger(__name__)
 

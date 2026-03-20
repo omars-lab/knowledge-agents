@@ -31,8 +31,8 @@ from knowledge_agents.utils.graph_utils import (
     create_graph_nodes_and_relationships,
     extract_from_note_file,
 )
-from notes.filter import should_skip_file
-from notes.traversal import get_files_from_last_month
+from knowledge_agents.notes.filter import should_skip_file
+from knowledge_agents.notes.traversal import get_files_from_last_month
 
 # Neo4j imports
 from neo4j import GraphDatabase

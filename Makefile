@@ -35,11 +35,29 @@ build: ## Build Docker images
 test: ## Run all tests
 	docker compose run --rm -v $(PWD)/build:/app/build test pytest tst/ -v --cov=src --cov-report=html:build/reports/coverage --cov-report=term
 
-unit-tests: ## Run unit tests only (fast, no external dependencies)
+conda-env-name := knowledge-agents
+
+conda-setup: ## Set up conda environment with dev dependencies
+	@echo "🔧 Setting up conda environment..."
+	@if ! conda env list | grep -q "^$(conda-env-name) "; then \
+		echo "📦 Creating conda environment: $(conda-env-name)"; \
+		conda create -n $(conda-env-name) python=3.11 -y; \
+	fi
+	@echo "📥 Installing dependencies..."
+	@conda run -n $(conda-env-name) pip install -q -r requirements-dev.txt
+	@conda run -n $(conda-env-name) pip install -q -r requirements.txt || true
+	@conda run -n $(conda-env-name) pip install -q markdown beautifulsoup4
+	@echo "✅ Conda environment ready"
+
+unit-tests: ## Run unit tests only (fast, no external dependencies) - Uses conda environment
 	@echo "🧪 Running unit tests..."
 	@echo "   This verifies dependency injection, client managers, and utilities work correctly"
 	@echo "   No external services (DB, Qdrant, LiteLLM) required - runs in seconds"
-	docker compose run --rm -v $(PWD)/build:/app/build -v $(PWD)/tst:/app/tst -v $(PWD)/src:/app/src test pytest tst/unit/ -v -m "unit" --cov=src --cov-report=html:build/reports/coverage/unit --cov-report=term --tb=short
+	@if ! conda env list | grep -q "^$(conda-env-name) "; then \
+		echo "❌ Conda environment '$(conda-env-name)' not found. Run 'make conda-setup' first."; \
+		exit 1; \
+	fi
+	@conda run -n $(conda-env-name) pytest tst/unit/ -v -m "unit" --cov=src --cov-report=html:build/reports/coverage/unit --cov-report=term --tb=short
 	@echo "✅ Unit tests completed"
 
 test-unit: unit-tests ## Alias for unit-tests
@@ -292,9 +310,13 @@ test-one: ## Run single test (usage: make test-one TEST=path/to/test)
 	@if [ -z "$(TEST)" ]; then echo "❌ Please provide TEST=<path>"; exit 1; fi
 	docker compose run --rm -v $(PWD)/build:/app/build test pytest $(TEST) -v
 
-unit-test-one: ## Run single unit test (usage: make unit-test-one TEST=path/to/test)
+unit-test-one: ## Run single unit test (usage: make unit-test-one TEST=path/to/test) - Uses conda environment
 	@if [ -z "$(TEST)" ]; then echo "❌ Please provide TEST=<path>"; exit 1; fi
-	docker compose run --rm -v $(PWD)/build:/app/build test pytest $(TEST) -v -m "unit"
+	@if ! conda env list | grep -q "^$(conda-env-name) "; then \
+		echo "❌ Conda environment '$(conda-env-name)' not found. Run 'make conda-setup' first."; \
+		exit 1; \
+	fi
+	@conda run -n $(conda-env-name) pytest $(TEST) -v -m "unit"
 
 integration-test-one: ## Run single integration test (usage: make integration-test-one TEST=path/to/test)
 	@if [ -z "$(TEST)" ]; then echo "❌ Please provide TEST=<path>"; exit 1; fi

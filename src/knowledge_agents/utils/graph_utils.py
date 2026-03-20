@@ -432,7 +432,7 @@ async def extract_from_note_file(
                 print(f"❌ {path}: Extraction failed")
         ```
     """
-    from notes.parser import read_noteplan_file
+    from ..notes.parser import read_noteplan_file
     from ..agents.graph_builder_agent import run_graph_builder_agent
     
     try:
@@ -471,7 +471,7 @@ def read_noteplan_files_with_metadata(
     **Usage:**
     ```python
     from pathlib import Path
-    from notes.traversal import get_files_from_last_month
+    from ..notes.traversal import get_files_from_last_month
     from knowledge_agents.utils.graph_utils import read_noteplan_files_with_metadata
     
     NOTEPLAN_DIR = Path("/noteplan")
@@ -516,8 +516,8 @@ def read_noteplan_files_with_metadata(
         
     **Note:** Files that fail to read are skipped (logged as errors but don't stop processing).
     """
-    from notes.parser import read_noteplan_file
-    from notes.filter import should_skip_file
+    from ..notes.parser import read_noteplan_file
+    from ..notes.filter import should_skip_file
     
     file_contents = []
     file_metadata = []

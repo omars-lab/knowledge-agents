@@ -13,7 +13,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from notes.parser import parse_markdown_to_structure
+from knowledge_agents.notes.parser import parse_markdown_to_structure
 
 pytestmark = [pytest.mark.unit]
 
@@ -303,67 +303,67 @@ class TestRealWorldScenarios:
     """Test real-world NotePlan daily plan scenarios."""
 
     def test_daily_plan_structure(self):
-        """Test a typical daily plan structure."""
+        """Test a typical daily plan structure with synthetic data."""
         markdown = """
-# Morning Routine
-## Exercise
-- [ ] Go for a run
-- [x] Stretch
-## Breakfast
-- [ ] Make coffee
-- [ ] Eat breakfast
+# Section A
+## Subsection A1
+- [ ] Task A1.1
+- [x] Task A1.2
+## Subsection A2
+- [ ] Task A2.1
+- [ ] Task A2.2
 
-# Work Tasks
-## Important
-- [ ] Review PRs
-- [ ] Write documentation
-## Meetings
-- [x] Standup
-- [ ] Team sync
+# Section B
+## Subsection B1
+- [ ] Task B1.1
+- [ ] Task B1.2
+## Subsection B2
+- [x] Task B2.1
+- [ ] Task B2.2
 
-# Evening
-- [ ] Read book
-- [ ] Plan tomorrow
+# Section C
+- [ ] Task C1
+- [ ] Task C2
 """
         result = parse_markdown_to_structure(markdown)
 
-        # Should have 5 sections: Morning Routine, Exercise, Breakfast, Work Tasks, Important, Meetings, Evening
-        # Actually, let me count: H1 Morning Routine, H2 Exercise, H2 Breakfast, H1 Work Tasks, H2 Important, H2 Meetings, H1 Evening
+        # Should have 7 sections: H1 Section A, H2 Subsection A1, H2 Subsection A2, H1 Section B, H2 Subsection B1, H2 Subsection B2, H1 Section C
+        # Should have 10 todos: Task A1.1, Task A1.2, Task A2.1, Task A2.2, Task B1.1, Task B1.2, Task B2.1, Task B2.2, Task C1, Task C2
         assert len(result["sections"]) == 7
-        assert len(result["todos"]) == 8
+        assert len(result["todos"]) == 10
 
         # Verify section hierarchy
-        morning_routine = result["sections"][0]
-        assert morning_routine["text"] == "Morning Routine"
-        assert morning_routine["level"] == 1
+        section_a = result["sections"][0]
+        assert section_a["text"] == "Section A"
+        assert section_a["level"] == 1
 
-        exercise = result["sections"][1]
-        assert exercise["text"] == "Exercise"
-        assert exercise["level"] == 2
-        assert exercise["parent_id"] == morning_routine["id"]
+        subsection_a1 = result["sections"][1]
+        assert subsection_a1["text"] == "Subsection A1"
+        assert subsection_a1["level"] == 2
+        assert subsection_a1["parent_id"] == section_a["id"]
 
         # Verify todos have correct hierarchy
         todos_by_text = {todo["text"]: todo for todo in result["todos"]}
 
-        # Todo under Exercise should have Morning Routine and Exercise
-        run_todo = todos_by_text["Go for a run"]
-        assert len(run_todo["section_ids"]) == 2
-        assert run_todo["section_ids"][0] == morning_routine["id"]
-        assert run_todo["section_ids"][1] == exercise["id"]
-        assert run_todo["completed"] is False
+        # Todo under Subsection A1 should have Section A and Subsection A1
+        task_a1_1 = todos_by_text["Task A1.1"]
+        assert len(task_a1_1["section_ids"]) == 2
+        assert task_a1_1["section_ids"][0] == section_a["id"]
+        assert task_a1_1["section_ids"][1] == subsection_a1["id"]
+        assert task_a1_1["completed"] is False
 
         # Completed todo
-        stretch_todo = todos_by_text["Stretch"]
-        assert stretch_todo["completed"] is True
+        task_a1_2 = todos_by_text["Task A1.2"]
+        assert task_a1_2["completed"] is True
 
-        # Todo under Work Tasks -> Important should have Work Tasks and Important
-        work_tasks = [s for s in result["sections"] if s["text"] == "Work Tasks"][0]
-        important = [s for s in result["sections"] if s["text"] == "Important"][0]
+        # Todo under Section B -> Subsection B1 should have Section B and Subsection B1
+        section_b = [s for s in result["sections"] if s["text"] == "Section B"][0]
+        subsection_b1 = [s for s in result["sections"] if s["text"] == "Subsection B1"][0]
 
-        review_todo = todos_by_text["Review PRs"]
-        assert len(review_todo["section_ids"]) == 2
-        assert review_todo["section_ids"][0] == work_tasks["id"]
-        assert review_todo["section_ids"][1] == important["id"]
+        task_b1_1 = todos_by_text["Task B1.1"]
+        assert len(task_b1_1["section_ids"]) == 2
+        assert task_b1_1["section_ids"][0] == section_b["id"]
+        assert task_b1_1["section_ids"][1] == subsection_b1["id"]
 
     def test_mixed_completed_and_incomplete(self):
         """Test mix of completed and incomplete todos."""
@@ -385,48 +385,46 @@ class TestRealWorldScenarios:
         assert result["todos"][4]["completed"] is True
 
     def test_complex_nested_structure(self):
-        """Test a complex nested structure with multiple levels."""
+        """Test a complex nested structure with multiple levels using synthetic data."""
         markdown = """
-# Project Alpha
-## Phase 1
+# Project X
+## Stage 1
 ### Planning
 - [ ] Create plan
 - [x] Get approval
 ### Execution
 - [ ] Start implementation
-## Phase 2
-- [ ] Review Phase 1
-# Project Beta
+## Stage 2
+- [ ] Review Stage 1
+# Project Y
 - [ ] Initial setup
 """
         result = parse_markdown_to_structure(markdown)
 
-        # Sections: Project Alpha, Phase 1, Planning, Execution, Phase 2, Project Beta
+        # Sections: Project X, Stage 1, Planning, Execution, Stage 2, Project Y
         assert len(result["sections"]) == 6
         assert len(result["todos"]) == 5
 
         # Find sections
-        project_alpha = [s for s in result["sections"] if s["text"] == "Project Alpha"][
-            0
-        ]
-        phase_1 = [s for s in result["sections"] if s["text"] == "Phase 1"][0]
+        project_x = [s for s in result["sections"] if s["text"] == "Project X"][0]
+        stage_1 = [s for s in result["sections"] if s["text"] == "Stage 1"][0]
         planning = [s for s in result["sections"] if s["text"] == "Planning"][0]
 
         todos_by_text = {todo["text"]: todo for todo in result["todos"]}
 
-        # Todo under Planning should have Project Alpha, Phase 1, Planning
+        # Todo under Planning should have Project X, Stage 1, Planning
         create_plan = todos_by_text["Create plan"]
         assert len(create_plan["section_ids"]) == 3
-        assert create_plan["section_ids"][0] == project_alpha["id"]
-        assert create_plan["section_ids"][1] == phase_1["id"]
+        assert create_plan["section_ids"][0] == project_x["id"]
+        assert create_plan["section_ids"][1] == stage_1["id"]
         assert create_plan["section_ids"][2] == planning["id"]
 
-        # Todo under Phase 2 should have Project Alpha, Phase 2
-        review = todos_by_text["Review Phase 1"]
-        phase_2 = [s for s in result["sections"] if s["text"] == "Phase 2"][0]
+        # Todo under Stage 2 should have Project X, Stage 2
+        review = todos_by_text["Review Stage 1"]
+        stage_2 = [s for s in result["sections"] if s["text"] == "Stage 2"][0]
         assert len(review["section_ids"]) == 2
-        assert review["section_ids"][0] == project_alpha["id"]
-        assert review["section_ids"][1] == phase_2["id"]
+        assert review["section_ids"][0] == project_x["id"]
+        assert review["section_ids"][1] == stage_2["id"]
 
 
 class TestEdgeCases:

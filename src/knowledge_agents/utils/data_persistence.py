@@ -334,7 +334,7 @@ async def process_file_with_sections_and_embeddings(
         Logs are automatically written to stdout.log and stderr.log files.
         No need to capture or return log content separately.
     """
-    from notes.parser import read_noteplan_file
+    from ..notes.parser import read_noteplan_file
     from ..agents.graph_builder_agent import run_graph_builder_agent
     from .file_logging import file_logging_context, setup_file_logger
     from .vector_store_utils import estimate_tokens, generate_embeddings

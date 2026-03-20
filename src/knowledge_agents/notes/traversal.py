@@ -96,3 +96,7 @@ def get_files_from_last_month(noteplan_dir: Path) -> List[Tuple[Path, datetime]]
 
     logger.info(f"Found {len(files)} files from the last month")
     return files
+
+
+
+

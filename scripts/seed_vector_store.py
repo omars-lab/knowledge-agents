@@ -28,9 +28,9 @@ from knowledge_agents.config.api_config import Settings
 from knowledge_agents.config.logging_config import setup_logging
 from knowledge_agents.dependencies import Dependencies
 from knowledge_agents.utils.vector_store_utils import generate_embeddings
-from notes.filter import should_skip_file
-from notes.parser import read_noteplan_file
-from notes.traversal import get_files_from_last_month
+from knowledge_agents.notes.filter import should_skip_file
+from knowledge_agents.notes.parser import read_noteplan_file
+from knowledge_agents.notes.traversal import get_files_from_last_month
 
 # Configure logging using centralized config
 setup_logging()

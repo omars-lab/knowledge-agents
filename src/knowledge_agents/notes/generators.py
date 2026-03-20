@@ -78,3 +78,7 @@ def recent_files_generator(noteplan_dir: Path) -> Iterator[Tuple[Path, datetime,
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")
             continue
+
+
+
+

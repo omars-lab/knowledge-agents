@@ -39,16 +39,25 @@ This document explains how this repository is structured and how to properly mak
 ## 🚀 Getting Started
 
 ### 1. Initial Setup
-After cloning the repository, run the setup command:
+After cloning the repository, set up your development environment:
 
 ```bash
-make setup
+# Set up conda environment for unit tests (fast, local testing)
+make conda-setup
+
+# Build Docker images for integration tests and services
+make build
 ```
 
-This will:
-- Create the build directory structure
-- Build all Docker images
-- Set up the development environment
+**Conda Setup (`make conda-setup`)**:
+- Creates conda environment `knowledge-agents` with Python 3.11
+- Installs development dependencies (pytest, black, etc.)
+- Installs runtime dependencies needed for unit tests
+- **Required for unit tests** - Unit tests run locally using conda, not Docker
+
+**Docker Build (`make build`)**:
+- Builds Docker images for services
+- Required for integration tests and running the application
 
 ### 2. Start Development
 ```bash
@@ -58,7 +67,13 @@ make build
 # Start services
 make docker-up
 
-# Run tests
+# Run unit tests (fast, uses conda)
+make unit-tests
+
+# Run integration tests (uses Docker)
+make integration-tests
+
+# Run all tests
 make test
 ```
 
@@ -75,6 +90,20 @@ make test
 | `make release` | Before deployment | Runs all quality checks |
 | `make clean` | When done | Cleans up temporary files |
 
+### Unit Test Commands
+
+| Command | When to Use | What it Does |
+|---------|-------------|--------------|
+| `make conda-setup` | First time setup | Creates conda environment and installs dev dependencies |
+| `make unit-tests` | During development | Runs all unit tests using conda environment (fast, no Docker) |
+| `make unit-test-one TEST="path"` | Debug specific test | Runs single unit test using conda environment |
+
+**Important Notes:**
+- **Unit tests use conda environment** - They run locally without Docker containers for fast iteration
+- **No external dependencies** - Unit tests don't require databases, APIs, or other services
+- **Synthetic test data only** - Unit tests must use synthetic/fake data, never real note content
+- **Setup required** - Run `make conda-setup` once to set up the conda environment
+
 ### Integration Test Commands
 
 | Command | When to Use | What it Does |
@@ -83,6 +112,70 @@ make test
 | `make integration-tests-one-by-one` | Debug integration tests | Runs tests one by one, stops at first failure |
 | `make integration-test-one TEST="path"` | Debug specific test | Runs single integration test with debug logging |
 | `make sample-test` | Quick test | Runs specific unit and integration tests |
+
+### Unit Testing Setup and Guidelines
+
+#### Conda Environment Setup
+
+Unit tests run locally using a conda environment for fast iteration without Docker containers:
+
+```bash
+# First time setup - creates conda environment and installs dependencies
+make conda-setup
+
+# Run all unit tests
+make unit-tests
+
+# Run a specific unit test
+make unit-test-one TEST="tst/unit/notes/test_filter.py"
+```
+
+**Why conda for unit tests?**
+- **Fast iteration**: No Docker container startup overhead
+- **Local development**: Run tests directly on your machine
+- **No external services**: Unit tests don't need databases, APIs, or other services
+- **Isolated environment**: Conda keeps dependencies separate from system Python
+
+#### Unit Test Data Guidelines
+
+**⚠️ CRITICAL: Use synthetic data only in unit tests**
+
+Unit tests must **never** contain actual note content or personal data. Always use synthetic/fake data that mimics the structure but contains no real information.
+
+**✅ Good Examples:**
+```python
+# Synthetic section names
+markdown = """
+# Section A
+## Subsection A1
+- [ ] Task A1.1
+- [x] Task A1.2
+"""
+
+# Generic file paths
+file_path = Path("test_file.md")
+file_path = Path("Calendar/2025-01-15.md")  # Generic date, not real
+```
+
+**❌ Bad Examples:**
+```python
+# Real personal content - DO NOT USE
+markdown = """
+# Morning Routine
+## Exercise
+- [ ] Go for a run
+- [x] Stretch
+"""
+
+# Real file paths from your notes
+file_path = Path("/Users/omareid/Library/.../actual_note.md")
+```
+
+**Rationale:**
+- Keeps your personal notes private
+- Tests remain portable and shareable
+- No risk of accidentally committing personal data
+- Tests focus on functionality, not specific content
 
 ### Docker Build Commands
 
