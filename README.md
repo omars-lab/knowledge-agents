@@ -104,13 +104,12 @@ src/knowledge_agents/
 ├── guardrails/                # Input/output validation
 ├── services/                  # Business logic (note_query_service.py)
 ├── database/                  # Database models (Plan, Bucket, Task)
-└── utils/                     # Vector store utilities
-
-src/notes/                     # NotePlan parsing package
-├── parser.py                  # Markdown parsing
-├── traversal.py               # File discovery
-├── filter.py                  # File filtering
-└── generators.py              # Content generators
+├── notes/                     # NotePlan file parsing
+│   ├── parser.py              # Markdown parsing
+│   ├── traversal.py           # File discovery
+│   ├── filter.py              # File filtering
+│   └── generators.py          # Content generators
+└── utils/                     # Caching, persistence, text splitting, etc.
 ```
 
 ### High Level Solution Description
@@ -347,9 +346,11 @@ Query your notes and get AI-powered answers.
 
 | Command | Description |
 |---------|-------------|
-| `make setup` | Initial repository setup (run after cloning) |
-| `make build` | Build everything (Docker images + setup) |
-| `make start` | Start all services (PostgreSQL, Qdrant, LiteLLM proxy) |
+| `make build` | Build Docker images |
+| `make start` | Build + start all services (PostgreSQL, Qdrant, LiteLLM proxy) |
+| `make conda-setup` | Set up conda environment for unit tests (first time) |
+| `make unit-tests` | Run unit tests locally via conda (fast, no Docker) |
+| `make integration-tests` | Run integration tests in Docker |
 | `make db-seed` | Seed database and vector store from NotePlan files |
 | `make test` | Run all tests with coverage |
 | `make format` | Format code (black + isort) |
@@ -359,17 +360,18 @@ Query your notes and get AI-powered answers.
 ### Development Workflow
 
 ```bash
-# Build everything
-make build
+# First time setup
+make conda-setup            # Set up conda env for unit tests
+make build                  # Build Docker images
 
-# Run tests
-make test
+# Development workflow
+make unit-tests             # Fast unit tests (local, no Docker)
+make integration-tests      # Full integration tests (Docker)
+make test                   # All tests
 
-# Format code
-make format
-
-# Check if ready for release
-make release
+# Code quality
+make format                 # Format code (black + isort)
+make release                # All release checks
 
 # Clean up
 make clean
