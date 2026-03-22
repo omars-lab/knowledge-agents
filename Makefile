@@ -13,7 +13,7 @@
 #   All health check and helper logic has been moved to scripts/makefile-helper.sh
 #   This script contains reusable functions for complex Makefile operations.
 
-.PHONY: help start build test clean format lint type-check docker-up docker-down litellm litellm-embedding litellm-code tidy-mcp-up tidy-mcp-down tidy-mcp-restart tidy-mcp-logs tidy-mcp-test test-tools neo4j-seed-vector neo4j-seed-graph neo4j-build-graph neo4j-query neo4j-graph-builder-up neo4j-graph-builder-down neo4j-graph-builder-restart neo4j-graph-builder-logs
+.PHONY: help start build test clean format lint type-check docker-up docker-down litellm litellm-embedding litellm-code tidy-mcp-up tidy-mcp-down tidy-mcp-restart tidy-mcp-logs tidy-mcp-test test-tools neo4j-seed-vector neo4j-seed-graph neo4j-build-graph neo4j-query neo4j-graph-builder-up neo4j-graph-builder-down neo4j-graph-builder-restart neo4j-graph-builder-logs claude-agent-up claude-agent-down claude-agent-logs claude-agent-test claude-agent-eval claude-agent-clean-sessions
 
 # =============================================================================
 # MAIN TARGETS
@@ -452,4 +452,141 @@ test-note-query-api: ## Quick test of note query API endpoint (usage: make test-
 		-H "Content-Type: application/json" \
 		-H "Authorization: Bearer $$API_KEY" \
 		-d "{\"query\": \"$(QUERY)\"}" \
+		| ( command -v jq >/dev/null 2>&1 && jq . || cat )
+
+# =============================================================================
+# CLAUDE AGENT TARGETS
+# =============================================================================
+
+refresh-env: ## Refresh .env file with credentials from macOS Keychain + environment
+	@echo "🔑 Refreshing .env credentials..."
+	@touch .env; \
+	_update_env_key() { \
+		local key=$$1 val=$$2; \
+		if grep -q "^$$key=" .env 2>/dev/null; then \
+			sed -i '' "s|^$$key=.*|$$key=$$val|" .env; \
+		else \
+			echo "$$key=$$val" >> .env; \
+		fi; \
+	}; \
+	ANTHROPIC_KEY=""; \
+	if [ -n "$$ANTHROPIC_API_KEY" ]; then \
+		ANTHROPIC_KEY="$$ANTHROPIC_API_KEY"; \
+		echo "  ✅ ANTHROPIC_API_KEY from environment ($${#ANTHROPIC_KEY} chars)"; \
+	else \
+		ANTHROPIC_KEY=$$(security find-generic-password -a "ANTHROPIC_API_KEY" -w 2>/dev/null || true); \
+		if [ -n "$$ANTHROPIC_KEY" ] && [ "$${#ANTHROPIC_KEY}" -gt 20 ]; then \
+			echo "  ✅ ANTHROPIC_API_KEY from Keychain ($${#ANTHROPIC_KEY} chars)"; \
+		else \
+			ANTHROPIC_KEY=""; \
+			echo "  ⚠️  No ANTHROPIC_API_KEY found."; \
+			echo "     Set env var:  export ANTHROPIC_API_KEY=sk-ant-..."; \
+			echo "     Or Keychain:  security add-generic-password -a ANTHROPIC_API_KEY -s knowledge-agents -w 'sk-ant-...'"; \
+		fi; \
+	fi; \
+	if [ -n "$$ANTHROPIC_KEY" ]; then \
+		if grep -q "^ANTHROPIC_API_KEY=" .env 2>/dev/null; then \
+			sed -i '' "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$$ANTHROPIC_KEY|" .env; \
+		else \
+			echo "ANTHROPIC_API_KEY=$$ANTHROPIC_KEY" >> .env; \
+		fi; \
+	fi
+
+claude-agent-up: refresh-env ## Start Claude Agent service and its dependencies
+	@echo "🚀 Starting Claude Agent service..."
+	docker compose up -d --build claude-agent
+	@echo "⏳ Waiting for Claude Agent to be healthy..."
+	@$(PWD)/scripts/makefile-helper.sh check_service_health claude-agent --wait --timeout 60 || true
+	@echo "✅ Claude Agent service started on port 8004"
+
+claude-agent-login: ## Interactive login for Claude CLI inside the container (persists in volume)
+	@echo "🔐 Starting Claude CLI login inside container..."
+	@echo "   This opens a browser URL — follow the prompts to authenticate."
+	@echo "   Auth is stored in the 'claude_agent_config' Docker volume and persists across restarts."
+	@echo ""
+	docker exec -it knowledge-agents-claude-agent-1 claude auth login --claudeai
+	@echo ""
+	@echo "✅ Login complete. Checking auth status..."
+	@$(MAKE) claude-agent-auth-status
+
+claude-agent-auth-seed: ## Seed container auth from host macOS Keychain (no interactive login needed)
+	@echo "🔑 Seeding container Claude auth from host Keychain..."
+	@CREDS=$$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null); \
+	if [ -z "$$CREDS" ] || [ "$${#CREDS}" -lt 50 ]; then \
+		echo "❌ No valid credentials in Keychain (service='Claude Code-credentials')"; \
+		echo "   Run 'claude auth login' on the host first, then retry."; \
+		exit 1; \
+	fi; \
+	echo "$$CREDS" | docker exec -i knowledge-agents-claude-agent-1 bash -c \
+		'mkdir -p /home/agent/.claude && cat > /home/agent/.claude/.credentials.json && chmod 600 /home/agent/.claude/.credentials.json && echo "✅ Credentials seeded to container volume (.credentials.json)"'
+	@$(MAKE) claude-agent-auth-status
+
+claude-agent-auth-status: ## Check Claude CLI auth status + credential expiry in container
+	@echo "🔍 Claude CLI auth status:"
+	@AUTH_JSON=$$(docker exec knowledge-agents-claude-agent-1 claude auth status --json 2>/dev/null); \
+	if [ -n "$$AUTH_JSON" ]; then \
+		echo "$$AUTH_JSON" | python3 -m json.tool 2>/dev/null || echo "$$AUTH_JSON"; \
+		echo ""; \
+	else \
+		echo "❌ Not authenticated — run 'make claude-agent-login' or 'make claude-agent-auth-seed'"; \
+	fi
+	@echo "⏰ Token expiry check:"
+	@docker cp scripts/check_claude_auth_expiry.py knowledge-agents-claude-agent-1:/tmp/check_expiry.py 2>/dev/null; \
+	docker exec knowledge-agents-claude-agent-1 python3 /tmp/check_expiry.py 2>&1 || echo "  Could not check expiry"
+	@echo ""
+	@echo "🔄 To refresh: make claude-agent-login  |  make claude-agent-auth-seed"
+
+claude-agent-down: ## Stop Claude Agent service
+	@echo "🛑 Stopping Claude Agent service..."
+	docker compose stop claude-agent
+	@echo "✅ Claude Agent service stopped"
+
+claude-agent-logs: ## View Claude Agent service logs
+	docker compose logs -f claude-agent
+
+claude-agent-test: ## Run Claude Agent unit tests
+	@echo "🧪 Running Claude Agent unit tests..."
+	@if ! conda env list | grep -q "^$(conda-env-name) "; then \
+		echo "❌ Conda environment '$(conda-env-name)' not found. Run 'make conda-setup' first."; \
+		exit 1; \
+	fi
+	@conda run -n $(conda-env-name) pytest tst/unit/claude_agent/ -v -m "unit" --tb=short
+	@echo "✅ Claude Agent unit tests completed"
+
+claude-agent-integration-test: ## Run Claude Agent integration tests (requires running services)
+	@echo "🧪 Running Claude Agent integration tests..."
+	docker compose run --rm -v $(PWD)/build:/app/build -v $(PWD)/tst:/app/tst -v $(PWD)/src:/app/src test pytest tst/integration/claude_agent/ -v -m "claude_agent" --log-cli-level=INFO
+	@echo "✅ Claude Agent integration tests completed"
+
+claude-agent-eval: ## Run full Claude Agent eval suite
+	@echo "📊 Running Claude Agent eval suite..."
+	@conda run -n $(conda-env-name) python -m evals.claude_agent.runner
+	@echo "✅ Eval suite completed"
+
+claude-agent-eval-search: ## Run only search evals
+	@echo "📊 Running search evals..."
+	@conda run -n $(conda-env-name) python -m evals.claude_agent.runner --dataset note_search
+	@echo "✅ Search evals completed"
+
+claude-agent-eval-graph: ## Run only graph evals
+	@echo "📊 Running graph evals..."
+	@conda run -n $(conda-env-name) python -m evals.claude_agent.runner --dataset graph_building
+	@echo "✅ Graph evals completed"
+
+claude-agent-eval-report: ## Generate eval report from latest results
+	@echo "📊 Generating eval report..."
+	@conda run -n $(conda-env-name) python -m evals.claude_agent.report
+	@echo "✅ Eval report generated"
+
+claude-agent-clean-sessions: ## Clean up old session workspaces
+	@echo "🧹 Cleaning old session workspaces..."
+	@rm -rf build/sessions/*
+	@echo "✅ Session workspaces cleaned"
+
+claude-agent-chat: ## Quick test of Claude Agent chat (usage: make claude-agent-chat MSG="your question")
+	@if [ -z "$(MSG)" ]; then echo "❌ Please provide MSG=\"your question\""; exit 1; fi
+	@echo "💬 Sending message to Claude Agent: $(MSG)"
+	@curl -s -X POST "http://localhost:8004/api/v1/chat" \
+		-H "Content-Type: application/json" \
+		-d "{\"message\": \"$(MSG)\"}" \
 		| ( command -v jq >/dev/null 2>&1 && jq . || cat )

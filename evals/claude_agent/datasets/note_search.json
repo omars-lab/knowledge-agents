@@ -1,0 +1,55 @@
+{
+  "test_cases": [
+    {
+      "id": "read-001",
+      "description": "Read a specific calendar note",
+      "turns": [
+        {"input": "Read the note at Calendar/20251218.md and summarize it"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__read_note"],
+        "output_not_contains": ["error"],
+        "session_created": true
+      },
+      "grading": {
+        "tool_usage": "Did it call read_note with the correct path?",
+        "completeness": "Does the response summarize the note content?"
+      },
+      "tags": ["read", "single-turn"]
+    },
+    {
+      "id": "read-002",
+      "description": "Read and generate xcallback link",
+      "turns": [
+        {"input": "Read Calendar/20251223.md and give me a NotePlan link to open it"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__read_note", "mcp__notes__derive_xcallback_url"],
+        "output_not_contains": ["error", "failed"],
+        "session_created": true
+      },
+      "grading": {
+        "tool_usage": "Did it call both read_note and derive_xcallback_url?",
+        "links": "Does the response include a noteplan:// link?"
+      },
+      "tags": ["read", "links", "single-turn"]
+    },
+    {
+      "id": "read-003",
+      "description": "Read and follow up with questions",
+      "turns": [
+        {"input": "Read Calendar/20251226.md"},
+        {"input": "What are the main items or events mentioned in that note?"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__read_note"],
+        "output_not_contains": ["I cannot", "I don't have"],
+        "session_maintained": true
+      },
+      "grading": {
+        "context_retention": "Does the second turn reference the note from the first turn?"
+      },
+      "tags": ["read", "multi-turn"]
+    }
+  ]
+}

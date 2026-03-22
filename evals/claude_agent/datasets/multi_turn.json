@@ -1,0 +1,40 @@
+{
+  "test_cases": [
+    {
+      "id": "multi-001",
+      "description": "Two-turn read and follow-up",
+      "turns": [
+        {"input": "Read Calendar/20251227.md"},
+        {"input": "What are the key takeaways from that note?"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__read_note"],
+        "output_not_contains": ["I don't remember", "I cannot recall"],
+        "session_maintained": true
+      },
+      "grading": {
+        "context": "Does turn 2 reference content from turn 1?",
+        "coherence": "Is the conversation coherent across turns?"
+      },
+      "tags": ["multi-turn", "context"]
+    },
+    {
+      "id": "multi-002",
+      "description": "Read then build graph across turns",
+      "turns": [
+        {"input": "Read Calendar/20251226.md and tell me what entities you can extract from it"},
+        {"input": "Now build a knowledge graph from those entities"},
+        {"input": "Query the graph to show what you just created"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__read_note", "mcp__notes__build_knowledge_graph", "mcp__notes__query_knowledge_graph"],
+        "session_maintained": true
+      },
+      "grading": {
+        "workflow": "Did the agent follow read -> extract -> build -> query across turns?",
+        "context": "Does each turn build on the previous?"
+      },
+      "tags": ["multi-turn", "graph", "workflow"]
+    }
+  ]
+}

@@ -130,3 +130,50 @@ RUN pip install --no-cache-dir -r requirements-graph-builder.txt
 COPY src/ ./src/
 COPY scripts/ ./scripts/
 COPY data/ ./data/
+
+# Claude Agent stage - multi-turn conversational agent
+FROM python:3.11-slim as claude-agent
+
+WORKDIR /app
+
+# Install system dependencies + Node.js for Claude CLI
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code CLI globally
+RUN npm install -g @anthropic-ai/claude-code
+
+# Create non-root user
+RUN useradd -m -s /bin/bash -d /home/agent agent
+
+# Set environment variables
+ENV PYTHONPATH=/app/src
+ENV PYTHONUNBUFFERED=1
+ENV HOME=/home/agent
+
+# Copy requirements and install dependencies
+COPY requirements-claude-agent.txt .
+RUN pip install --no-cache-dir -r requirements-claude-agent.txt
+
+# Copy application code
+COPY src/ ./src/
+
+# Create build directories and .claude config dir (for named volume mount point)
+RUN mkdir -p /app/build/sessions /app/build/logs /home/agent/.claude \
+    && chown -R agent:agent /app/build /home/agent/.claude
+
+# Switch to non-root user
+USER agent
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["python", "-m", "uvicorn", "knowledge_agents.claude_agent.server:app", "--host", "0.0.0.0", "--port", "8000"]

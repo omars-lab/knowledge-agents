@@ -1,0 +1,49 @@
+{
+  "test_cases": [
+    {
+      "id": "tool-001",
+      "description": "Should use read_note for specific file requests",
+      "turns": [
+        {"input": "Read the note at Notes/Ideas.md"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__read_note"],
+        "session_created": true
+      },
+      "grading": {
+        "tool_usage": "Did it correctly choose read_note?"
+      },
+      "tags": ["tool-selection", "read"]
+    },
+    {
+      "id": "tool-002",
+      "description": "Should use query_knowledge_graph for graph questions",
+      "turns": [
+        {"input": "What entities exist in the knowledge graph?"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__query_knowledge_graph"],
+        "session_created": true
+      },
+      "grading": {
+        "tool_usage": "Did it use query_knowledge_graph for a graph question?"
+      },
+      "tags": ["tool-selection", "graph"]
+    },
+    {
+      "id": "tool-003",
+      "description": "Should use derive_xcallback_url when asked for links",
+      "turns": [
+        {"input": "Give me a NotePlan link to Calendar/20250115.md"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__derive_xcallback_url"],
+        "session_created": true
+      },
+      "grading": {
+        "tool_usage": "Did it use derive_xcallback_url?"
+      },
+      "tags": ["tool-selection", "links"]
+    }
+  ]
+}

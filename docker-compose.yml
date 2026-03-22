@@ -157,10 +157,11 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "/app/scripts/healthcheck_litellm.sh"]
-      interval: 30s
+      test: ["CMD-SHELL", "curl -sf http://localhost:4000/health/liveliness || exit 1"]
+      interval: 15s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   # Test Service (uses build stage with test dependencies)
@@ -223,6 +224,71 @@ services:
     profiles:
       - seeding  # Only start when explicitly requested
 
+  # Neo4j Graph Database
+  neo4j:
+    image: neo4j:5-community
+    ports:
+      - "7474:7474"   # Browser UI
+      - "7687:7687"   # Bolt protocol
+    environment:
+      - NEO4J_AUTH=neo4j/knowledge123
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p knowledge123 'RETURN 1'"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Claude Agent Service - multi-turn conversational agent
+  claude-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: claude-agent
+    ports:
+      - "8004:8000"
+    environment:
+      - CLAUDE_AGENT_QDRANT_HOST=qdrant
+      - CLAUDE_AGENT_QDRANT_PORT=6333
+      - CLAUDE_AGENT_NEO4J_URI=bolt://neo4j:7687
+      - CLAUDE_AGENT_NEO4J_USERNAME=neo4j
+      - CLAUDE_AGENT_NEO4J_PASSWORD=knowledge123
+      - CLAUDE_AGENT_NEO4J_DATABASE=neo4j
+      - CLAUDE_AGENT_TIDY_MCP_URL=http://tidy-mcp:8000
+      - CLAUDE_AGENT_EMBEDDING_PROVIDER=proxy
+      - CLAUDE_AGENT_LITELLM_PROXY_HOST=llm-proxy
+      - CLAUDE_AGENT_LITELLM_PROXY_PORT=4000
+      - CLAUDE_AGENT_NOTEPLAN_DIR=/noteplan
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      # Claude CLI config + auth (persistent named volume, writable)
+      - claude_agent_config:/home/agent/.claude
+      # Source code (dev hot-reload)
+      - ./src:/app/src
+      # NotePlan notes directory (READ-ONLY)
+      - "/Users/omareid/Library/Containers/co.noteplan.NotePlan3/Data/Library/Application Support/co.noteplan.NotePlan3/:/noteplan:ro"
+      # Build artifacts (logs + session workspaces)
+      - ./build/logs:/app/build/logs
+      - ./build/sessions:/app/build/sessions
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      tidy-mcp:
+        condition: service_healthy
+      # llm-proxy dependency removed — embeddings handled externally (task #20)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
   # Neo4j Graph Builder Service - processes notes and builds knowledge graph
   neo4j-graph-builder:
     build:
@@ -260,6 +326,9 @@ volumes:
   postgres_data:
   prometheus_data:
   qdrant_data:
+  neo4j_data:
+  neo4j_logs:
+  claude_agent_config:
 
 secrets:
   openai_api_key:

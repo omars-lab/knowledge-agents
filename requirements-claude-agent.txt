@@ -1,0 +1,27 @@
+# Claude Agent Dependencies
+# Dependencies for the Claude Agent service
+
+# Claude Agent SDK
+claude-agent-sdk>=0.1.0
+
+# FastAPI + server
+fastapi>=0.100.0
+uvicorn>=0.20.0
+pydantic>=2.10.0
+pydantic-settings>=2.0.0
+sse-starlette>=1.6.0
+
+# Vector store
+qdrant-client>=1.7.0
+openai>=1.107.1
+
+# Graph database
+neo4j>=5.15.0
+
+# NotePlan parsing
+markdown>=3.5.0
+beautifulsoup4>=4.12.0
+
+# HTTP client (for tidy-mcp calls)
+requests>=2.31.0
+httpx>=0.24.0

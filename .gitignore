@@ -201,3 +201,8 @@ reports/
 
 # Project-specific: Secrets
 secrets/
+
+# Eval results (generated, may contain API costs)
+evals/claude_agent/results/*.json
+evals/claude_agent/results/*.md
+!evals/claude_agent/results/.gitkeep

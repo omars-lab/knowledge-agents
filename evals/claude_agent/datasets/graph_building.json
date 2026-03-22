@@ -1,0 +1,41 @@
+{
+  "test_cases": [
+    {
+      "id": "graph-001",
+      "description": "Read a note then build a knowledge graph from it",
+      "turns": [
+        {"input": "Read Calendar/20251218.md and tell me what entities you can extract from it"},
+        {"input": "Now build a knowledge graph from those entities you identified"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__read_note", "mcp__notes__build_knowledge_graph"],
+        "output_not_contains": ["error"],
+        "session_maintained": true
+      },
+      "grading": {
+        "extraction": "Were meaningful entities extracted?",
+        "tool_usage": "Did it use read_note then build_knowledge_graph?"
+      },
+      "tags": ["graph", "multi-turn"]
+    },
+    {
+      "id": "graph-002",
+      "description": "Build graph then query it",
+      "turns": [
+        {"input": "Read Calendar/20251223.md and tell me what entities and relationships you find"},
+        {"input": "Build a knowledge graph from those entities and relationships"},
+        {"input": "Query the graph to show what entities were just created"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__read_note", "mcp__notes__build_knowledge_graph", "mcp__notes__query_knowledge_graph"],
+        "output_not_contains": ["error"],
+        "session_maintained": true
+      },
+      "grading": {
+        "workflow": "Did it follow the read -> build -> query workflow?",
+        "results": "Did the graph query return meaningful results?"
+      },
+      "tags": ["graph", "query", "multi-turn"]
+    }
+  ]
+}
