@@ -50,6 +50,23 @@
         "context_retention": "Does the second turn reference the note from the first turn?"
       },
       "tags": ["read", "multi-turn"]
+    },
+    {
+      "id": "read-004",
+      "description": "Handle nonexistent file gracefully",
+      "turns": [
+        {"input": "Read Notes/this-file-does-not-exist-12345.md"}
+      ],
+      "expected": {
+        "tools_used": ["mcp__notes__read_note"],
+        "output_not_contains": ["traceback", "exception"],
+        "session_created": true
+      },
+      "grading": {
+        "error_handling": "Does the agent explain the file was not found without crashing?",
+        "helpfulness": "Does it suggest alternatives or ask for clarification?"
+      },
+      "tags": ["read", "edge-case", "error-handling"]
     }
   ]
 }

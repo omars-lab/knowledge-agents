@@ -44,6 +44,23 @@
         "tool_usage": "Did it use derive_xcallback_url?"
       },
       "tags": ["tool-selection", "links"]
+    },
+    {
+      "id": "tool-004",
+      "description": "Should not use tools for general knowledge questions",
+      "turns": [
+        {"input": "What is a knowledge graph and how does it work?"}
+      ],
+      "expected": {
+        "tools_used": [],
+        "output_not_contains": ["error"],
+        "session_created": true
+      },
+      "grading": {
+        "tool_usage": "Did the agent answer from its own knowledge without calling tools?",
+        "quality": "Is the explanation accurate and clear?"
+      },
+      "tags": ["tool-selection", "no-tools", "edge-case"]
     }
   ]
 }

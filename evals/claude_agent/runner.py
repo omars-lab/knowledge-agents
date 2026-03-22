@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -29,6 +30,7 @@ RESULTS_DIR = Path(__file__).parent / "results"
 AGENT_BASE_URL = "http://localhost:8004"
 REQUEST_TIMEOUT = 300  # seconds per HTTP request
 DELAY_BETWEEN_CASES = 3  # seconds between eval test cases (rate limit spacing)
+LLM_GRADING = False  # opt-in LLM-based quality grading
 
 
 def load_dataset(name: str) -> dict:
@@ -93,13 +95,25 @@ def run_test_case(case: dict) -> dict:
             results["turns"].append(turn_result)
             results["total_duration_ms"] += turn_result["duration_ms"]
 
+        except requests.Timeout as e:
+            results["error"] = {"type": "timeout", "message": str(e), "turn": i + 1}
+            logger.error("Timeout running case %s turn %d: %s", case_id, i + 1, e)
+            break
+        except requests.HTTPError as e:
+            status = e.response.status_code if e.response is not None else 0
+            error_type = {503: "transport_error", 401: "auth_error"}.get(status, "http_error")
+            results["error"] = {"type": error_type, "status": status, "message": str(e), "turn": i + 1}
+            logger.error("HTTP %d running case %s turn %d: %s", status, case_id, i + 1, e)
+            break
         except Exception as e:
-            results["error"] = str(e)
+            results["error"] = {"type": "unknown", "message": str(e), "turn": i + 1}
             logger.error("Error running case %s turn %d: %s", case_id, i + 1, e)
             break
 
     # Score the result
-    results["scores"] = score_response(results, expected, case.get("grading", {}))
+    results["scores"] = score_response(
+        results, expected, case.get("grading", {}), llm_grading=LLM_GRADING,
+    )
     results["tools_used"] = list(set(results["tools_used"]))
 
     return results
@@ -133,10 +147,12 @@ def run_dataset(name: str) -> dict:
 
         if result.get("error"):
             run_results["errors"] += 1
-        elif all(s >= 0.5 for s in result.get("scores", {}).values()):
-            run_results["passed"] += 1
         else:
-            run_results["failed"] += 1
+            overall = result.get("scores", {}).get("overall", 0)
+            if overall >= 0.5:
+                run_results["passed"] += 1
+            else:
+                run_results["failed"] += 1
 
         run_results["total_cost_usd"] += result.get("total_cost_usd", 0)
 
@@ -161,7 +177,7 @@ def run_dataset(name: str) -> dict:
 
 def main():
     """CLI entry point."""
-    global AGENT_BASE_URL, DELAY_BETWEEN_CASES, REQUEST_TIMEOUT
+    global AGENT_BASE_URL, DELAY_BETWEEN_CASES, REQUEST_TIMEOUT, LLM_GRADING
 
     parser = argparse.ArgumentParser(description="Run Claude Agent evals")
     parser.add_argument(
@@ -172,6 +188,7 @@ def main():
     parser.add_argument("--url", default=AGENT_BASE_URL, help="Agent API URL")
     parser.add_argument("--delay", type=int, default=DELAY_BETWEEN_CASES, help="Seconds between test cases (default: 3)")
     parser.add_argument("--timeout", type=int, default=REQUEST_TIMEOUT, help="HTTP request timeout in seconds (default: 300)")
+    parser.add_argument("--llm-grading", action="store_true", default=False, help="Enable LLM-based quality grading (requires ANTHROPIC_API_KEY)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -179,6 +196,14 @@ def main():
     AGENT_BASE_URL = args.url
     DELAY_BETWEEN_CASES = args.delay
     REQUEST_TIMEOUT = args.timeout
+    LLM_GRADING = args.llm_grading
+
+    if LLM_GRADING:
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            logger.warning("--llm-grading requires ANTHROPIC_API_KEY env var; falling back to code-based grading")
+            LLM_GRADING = False
+        else:
+            logger.info("LLM-based quality grading enabled (model: claude-haiku-4-5)")
 
     if args.dataset:
         datasets = [args.dataset]

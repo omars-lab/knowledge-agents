@@ -1,81 +1,159 @@
-# Fix ~60s CLI Subprocess Timeout for Complex Tool Queries
+# Refactor Eval Framework to Anthropic Success Criteria Patterns
 
 ## Context
 
-The Claude Agent SDK's CLI subprocess dies after exactly ~60 seconds during complex single-turn queries that require multiple sequential tool calls (e.g., "read a note AND build a knowledge graph from it"). Multi-turn conversations where each turn does one tool call work fine.
+Current eval framework is a functional smoke test: it checks tool invocation (substring match) and keyword presence in output. It passes 10/10 but doesn't measure **response quality, factual correctness, context retention, latency, or cost efficiency**. The `grading` field in test cases is documentation-only — never evaluated.
 
-**Root cause found:** The SDK's `Query` class reads `CLAUDE_CODE_STREAM_CLOSE_TIMEOUT` (default 60,000ms = 60s). When SDK MCP servers are registered, `wait_for_result_and_end_input()` uses `anyio.move_on_after(60s)` to wait for the first result, then **silently closes stdin** — killing the bidirectional control protocol mid-flight while the CLI is still processing tool calls.
+Anthropic's eval guidance recommends: specific/measurable criteria, LLM-based grading for nuanced quality, code-based grading for deterministic checks, and volume over perfection.
 
-**Location:** `claude_agent_sdk/_internal/query.py` line ~77:
-```python
-self._stream_close_timeout = float(os.environ.get("CLAUDE_CODE_STREAM_CLOSE_TIMEOUT", "60000")) / 1000.0
-```
+**Goal:** Upgrade the eval framework to measure what actually matters while keeping it fast and automated.
 
-**Why multi-turn works:** Each turn is an independent `query()` call. The 60s timer resets per turn. Individual tool calls complete well within 60s.
+## Current Gaps (prioritized)
 
-**Why single-turn multi-tool fails:** The agent reasons → calls tool A → waits for result → reasons → calls tool B. The total elapsed time exceeds 60s, stdin gets closed, and tool B's control response can't be written.
+1. **No response quality scoring** — answers could be hallucinated and we'd never know
+2. **Context retention is binary** — checks session_id exists, not if context was used
+3. **No latency tracking** — can't detect performance regressions
+4. **No error categorization** — timeouts, auth failures, and tool errors all lumped as "error"
+5. **Grading config is dead code** — test cases have `grading` field but scorer ignores it
 
 ## Plan
 
-### Step 1: Set `CLAUDE_CODE_STREAM_CLOSE_TIMEOUT` to 5 minutes
+### Step 1: Add LLM-based response quality grading to scorer
 
-**File:** `docker-compose.yml`
+**File:** `evals/claude_agent/scorer.py`
 
-Add the environment variable to the claude-agent service:
-```yaml
-environment:
-  - CLAUDE_CODE_STREAM_CLOSE_TIMEOUT=300000  # 5 min (default 60s was killing multi-tool queries)
-```
+Add a new `response_quality` dimension that uses Claude (via the Anthropic SDK) to grade responses on a 1-5 Likert scale. The grading prompt uses the test case's `grading` rubric (which already exists in every test case but is currently unused).
 
-This is the primary fix. 300s (5 min) gives ample time for complex multi-tool workflows within a single turn.
-
-### Step 2: Revert graph_building evals to single-turn format
-
-**File:** `evals/claude_agent/datasets/graph_building.json`
-
-The workaround of splitting graph-001 and graph-002 into multi-turn is no longer needed. Revert to the more natural single-turn format:
-- graph-001: "Read Calendar/20251218.md and build a knowledge graph from the entities in it" (single turn)
-- graph-002: Keep as multi-turn (read → build → query) since that tests session continuity
-
-### Step 3: Document the finding as a gotcha
-
-**File:** `CLAUDE.md`
-
-Update gotcha #3 to document the actual root cause and fix:
-```
-3. **`CLAUDE_CODE_STREAM_CLOSE_TIMEOUT` defaults to 60s** — kills multi-tool queries.
-   Set to 300000 (5 min) in docker-compose.yml. The SDK silently closes stdin after this
-   timeout when SDK MCP servers are present, breaking bidirectional tool control.
-```
-
-### Step 4: Add timeout to startup auth check log
-
-**File:** `src/knowledge_agents/claude_agent/server.py`
-
-Log the configured stream close timeout at startup so it's visible in logs:
 ```python
-logger.info("Stream close timeout: %ss", os.environ.get("CLAUDE_CODE_STREAM_CLOSE_TIMEOUT", "60000 (default)"))
+def _grade_with_llm(output: str, grading: dict[str, str], input_text: str) -> float:
+    """Use Claude to grade response quality on a 1-5 scale."""
+    rubric = "\n".join(f"- {k}: {v}" for k, v in grading.items())
+    prompt = f"""Rate this agent response on a scale of 1-5 based on these criteria:
+{rubric}
+
+User query: {input_text}
+Agent response: {output}
+
+Output only a JSON object: {{"score": <1-5>, "reasoning": "<brief explanation>"}}"""
+
+    # Call Claude API directly (not via the agent SDK)
+    response = anthropic_client.messages.create(
+        model="claude-haiku-4-5-20251001",  # cheap/fast for grading
+        max_tokens=200,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    # Parse score, normalize to 0.0-1.0
+```
+
+Use `claude-haiku-4-5-20251001` for grading — cheap, fast, good enough for Likert scales. Only run LLM grading when `grading` config exists in the test case.
+
+**Scoring:** Score 1→0.0, 2→0.25, 3→0.5, 4→0.75, 5→1.0
+
+### Step 2: Add latency and cost tracking to scorer
+
+**File:** `evals/claude_agent/scorer.py`
+
+Add `latency` and `cost` dimensions that track absolute values (not pass/fail). These are informational metrics stored in results for regression detection.
+
+```python
+# In score_response():
+if result.get("total_duration_ms"):
+    scores["latency_ms"] = result["total_duration_ms"]  # raw value, not 0-1
+if result.get("total_cost_usd"):
+    scores["cost_usd"] = result["total_cost_usd"]  # raw value, not 0-1
+```
+
+Exclude these from the `overall` average (they're not 0-1 scores).
+
+### Step 3: Categorize errors in runner
+
+**File:** `evals/claude_agent/runner.py`
+
+Replace the generic `error` field with structured error categorization:
+
+```python
+except requests.Timeout:
+    results["error"] = {"type": "timeout", "message": "..."}
+except requests.HTTPError as e:
+    status = e.response.status_code
+    if status == 503:
+        results["error"] = {"type": "transport_error", "message": "..."}
+    elif status == 401:
+        results["error"] = {"type": "auth_error", "message": "..."}
+    else:
+        results["error"] = {"type": "http_error", "status": status, "message": "..."}
+except Exception as e:
+    results["error"] = {"type": "unknown", "message": str(e)}
+```
+
+### Step 4: Add context retention scoring for multi-turn
+
+**File:** `evals/claude_agent/scorer.py`
+
+For multi-turn cases (`session_maintained: true`), use LLM grading to check if later turns actually reference content from earlier turns:
+
+```python
+def _grade_context_retention(turns: list[dict]) -> float:
+    """LLM grades whether later turns use context from earlier turns."""
+    if len(turns) < 2:
+        return 1.0
+    # Build conversation transcript, ask Claude to rate context usage 1-5
+```
+
+### Step 5: Upgrade report with richer metrics
+
+**File:** `evals/claude_agent/report.py`
+
+Add to the markdown report:
+- Per-case latency and cost columns
+- Error breakdown by type (timeout, transport, auth, http)
+- Response quality scores (when LLM grading is available)
+- Comparison with previous run (if a prior result file exists)
+
+### Step 6: Add edge case test cases
+
+**Files:** `evals/claude_agent/datasets/*.json`
+
+Add edge cases to existing datasets:
+- `note_search.json`: Add `read-004` with a nonexistent file path (expects graceful error handling)
+- `tool_selection.json`: Add `tool-004` with an ambiguous query (tests tool reasoning)
+- `graph_building.json`: Add `graph-003` with an empty note (expects graceful "no entities found")
+
+### Step 7: Add ANTHROPIC_API_KEY config for LLM grading
+
+**File:** `evals/claude_agent/scorer.py`, `evals/claude_agent/runner.py`
+
+LLM grading needs an Anthropic API key. Use `ANTHROPIC_API_KEY` from environment (already used by the container). Add `--llm-grading` flag to runner to enable/disable (disabled by default for speed).
+
+```bash
+# Fast run (code-based grading only)
+python -m evals.claude_agent.runner
+
+# Full run with LLM quality grading
+python -m evals.claude_agent.runner --llm-grading
 ```
 
 ## Critical Files
 
 | File | Change |
 |------|--------|
-| `docker-compose.yml` | Add `CLAUDE_CODE_STREAM_CLOSE_TIMEOUT=300000` |
-| `evals/claude_agent/datasets/graph_building.json` | Revert graph-001 to single-turn |
-| `CLAUDE.md` | Update gotcha #3 with root cause |
-| `src/knowledge_agents/claude_agent/server.py` | Log timeout at startup |
+| `evals/claude_agent/scorer.py` | LLM grading, latency/cost tracking, context retention |
+| `evals/claude_agent/runner.py` | Error categorization, --llm-grading flag |
+| `evals/claude_agent/report.py` | Richer metrics table, error breakdown |
+| `evals/claude_agent/datasets/*.json` | Edge case test cases |
+| `requirements-claude-agent.txt` | Add `anthropic` package for LLM grading |
 
 ## Verification
 
-1. Rebuild: `docker compose up -d --build claude-agent`
-2. Reseed auth: `make claude-agent-auth-seed`
-3. Test the exact failing query directly:
-   ```bash
-   curl -s -m 300 -X POST http://localhost:8004/api/v1/chat \
-     -H "Content-Type: application/json" \
-     -d '{"message": "Read Calendar/20251218.md and build a knowledge graph from the entities in it"}'
-   ```
-4. Run full eval: `conda run -n knowledge-agents python -m evals.claude_agent.runner`
-5. Target: 10/10 passed with single-turn graph building working
-6. Unit tests: `conda run -n knowledge-agents pytest tst/unit/claude_agent/ -v -m unit`
+1. Unit tests: `conda run -n knowledge-agents pytest tst/unit/claude_agent/ -v -m unit`
+2. Fast eval (no LLM grading): `python -m evals.claude_agent.runner`
+3. Full eval with grading: `ANTHROPIC_API_KEY=... python -m evals.claude_agent.runner --llm-grading`
+4. Report: `python -m evals.claude_agent.report` — verify new columns appear
+5. Edge cases: verify graceful error handling, not crashes
+
+## Design Decisions
+
+- **Haiku for grading, not Opus** — 10x cheaper, fast enough for Likert scales, different model than the one being evaluated (best practice)
+- **LLM grading opt-in** — default runs are fast/free (code-based only), `--llm-grading` adds quality scoring at ~$0.001/case
+- **Latency/cost as raw values** — not normalized to 0-1, excluded from overall score, used for regression tracking
+- **Grading rubrics reuse existing `grading` field** — no test case changes needed for LLM grading to work
