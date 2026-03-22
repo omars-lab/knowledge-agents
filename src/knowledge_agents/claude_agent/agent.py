@@ -16,6 +16,7 @@ from typing import Any, AsyncIterator
 from claude_agent_sdk import ClaudeAgentOptions, query
 from claude_agent_sdk.types import (
     AssistantMessage,
+    RateLimitEvent,
     ResultMessage,
     StreamEvent,
     TextBlock,
@@ -270,6 +271,38 @@ async def stream_agent_response(
                     "cost_usd": msg.total_cost_usd,
                     "turns": msg.num_turns,
                     "duration_ms": msg.duration_ms,
+                }
+
+            elif isinstance(msg, RateLimitEvent):
+                info = msg.rate_limit_info
+                elapsed_ms = int((time.monotonic() - start) * 1000)
+                if info.status == "rejected":
+                    logger.warning(
+                        "RATE LIMITED (rejected) — utilization=%.0f%% resets_at=%s type=%s elapsed=%dms",
+                        (info.utilization or 0) * 100,
+                        info.resets_at,
+                        info.rate_limit_type,
+                        elapsed_ms,
+                    )
+                elif info.status == "allowed_warning":
+                    logger.info(
+                        "rate limit warning — utilization=%.0f%% type=%s elapsed=%dms",
+                        (info.utilization or 0) * 100,
+                        info.rate_limit_type,
+                        elapsed_ms,
+                    )
+                else:
+                    logger.debug(
+                        "rate limit allowed — utilization=%.0f%% type=%s",
+                        (info.utilization or 0) * 100,
+                        info.rate_limit_type,
+                    )
+                yield {
+                    "type": "rate_limit",
+                    "status": info.status,
+                    "utilization": info.utilization,
+                    "rate_limit_type": info.rate_limit_type,
+                    "resets_at": info.resets_at,
                 }
 
     except Exception as exc:

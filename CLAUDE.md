@@ -123,6 +123,8 @@ When discovering non-obvious gotchas, limitations, or workarounds during impleme
 
 7. **LiteLLM healthcheck script takes 60s with `--location` flag + API key.** Use `/health/liveliness` endpoint instead of the complex healthcheck script for Docker healthchecks.
 
+8. **Claude API rate limiting causes silent waits, not errors.** The CLI auto-retries 429s with backoff. This manifests as 60-300s response times, not error messages. The SDK emits `RateLimitEvent` with `status` (allowed/allowed_warning/rejected) and `utilization` %. The agent logs these at INFO/WARNING level. The eval runner has `--delay` (seconds between cases, default 3) and `--timeout` (seconds per request, default 300) to manage pacing.
+
 ## Testing Rules
 
 ### Never Remove or Skip Tests

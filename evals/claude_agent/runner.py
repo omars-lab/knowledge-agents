@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 DATASETS_DIR = Path(__file__).parent / "datasets"
 RESULTS_DIR = Path(__file__).parent / "results"
 AGENT_BASE_URL = "http://localhost:8004"
+REQUEST_TIMEOUT = 300  # seconds per HTTP request
+DELAY_BETWEEN_CASES = 3  # seconds between eval test cases (rate limit spacing)
 
 
 def load_dataset(name: str) -> dict:
@@ -67,7 +69,7 @@ def run_test_case(case: dict) -> dict:
             response = requests.post(
                 f"{AGENT_BASE_URL}/api/v1/chat",
                 json=payload,
-                timeout=300,
+                timeout=REQUEST_TIMEOUT,
             )
             response.raise_for_status()
             data = response.json()
@@ -121,7 +123,10 @@ def run_dataset(name: str) -> dict:
         "cases": [],
     }
 
-    for case in test_cases:
+    for i, case in enumerate(test_cases):
+        if i > 0 and DELAY_BETWEEN_CASES > 0:
+            logger.info("  Waiting %ds between cases (rate limit spacing)...", DELAY_BETWEEN_CASES)
+            time.sleep(DELAY_BETWEEN_CASES)
         logger.info("  Running case: %s", case["id"])
         result = run_test_case(case)
         run_results["cases"].append(result)
@@ -156,7 +161,7 @@ def run_dataset(name: str) -> dict:
 
 def main():
     """CLI entry point."""
-    global AGENT_BASE_URL
+    global AGENT_BASE_URL, DELAY_BETWEEN_CASES, REQUEST_TIMEOUT
 
     parser = argparse.ArgumentParser(description="Run Claude Agent evals")
     parser.add_argument(
@@ -165,11 +170,15 @@ def main():
         help="Run a specific dataset (default: all)",
     )
     parser.add_argument("--url", default=AGENT_BASE_URL, help="Agent API URL")
+    parser.add_argument("--delay", type=int, default=DELAY_BETWEEN_CASES, help="Seconds between test cases (default: 3)")
+    parser.add_argument("--timeout", type=int, default=REQUEST_TIMEOUT, help="HTTP request timeout in seconds (default: 300)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     AGENT_BASE_URL = args.url
+    DELAY_BETWEEN_CASES = args.delay
+    REQUEST_TIMEOUT = args.timeout
 
     if args.dataset:
         datasets = [args.dataset]
