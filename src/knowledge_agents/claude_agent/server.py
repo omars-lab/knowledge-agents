@@ -142,11 +142,13 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing Claude Agent tool clients...")
     try:
         init_tool_clients(settings)
+        stream_timeout = os.environ.get("CLAUDE_CODE_STREAM_CLOSE_TIMEOUT", "60000")
         logger.info(
-            "Claude Agent service ready — qdrant=%s:%s neo4j=%s",
+            "Claude Agent service ready — qdrant=%s:%s neo4j=%s stream_close_timeout=%sms",
             settings.qdrant_host,
             settings.qdrant_port,
             settings.neo4j_uri,
+            stream_timeout,
         )
     except Exception:
         logger.exception("FATAL: Failed to initialize tool clients")

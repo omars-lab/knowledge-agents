@@ -113,7 +113,7 @@ When discovering non-obvious gotchas, limitations, or workarounds during impleme
 
 2. **`tools=TOOL_NAMES` restricts available tools; `allowed_tools` only controls permissions.** Without `tools=`, the agent has access to ALL Claude Code tools (Bash, Read, Write, ToolSearch) and will use them unpredictably.
 
-3. **CLI subprocess has a ~60s session timeout.** Single messages requiring multiple tool calls (read + extract + build) can exceed this. Split complex workflows into separate turns instead of one-shot prompts.
+3. **`CLAUDE_CODE_STREAM_CLOSE_TIMEOUT` defaults to 60s — kills multi-tool queries.** The SDK silently closes stdin after this timeout when SDK MCP servers are present (`anyio.move_on_after` in `query.py:wait_for_result_and_end_input`). Set to `1800000` (30 min) via env var in docker-compose.yml. Without this, queries die with `CLIConnectionError: ProcessTransport is not ready for writing`. Note: even with the timeout raised, single-turn multi-tool queries can take 5-10+ minutes due to subscription-tier API rate limiting between tool calls. **Best practice: split complex workflows into multi-turn conversations** where each turn does one tool call — this is both faster and more reliable.
 
 4. **Blocking I/O in tool handlers kills the subprocess.** The SDK runs an async event loop to service CLI keepalive messages. Synchronous Neo4j/HTTP calls block this loop, causing `CLIConnectionError: ProcessTransport is not ready for writing`. Always use `asyncio.to_thread()` for blocking operations.
 

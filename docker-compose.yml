@@ -264,6 +264,9 @@ services:
       - CLAUDE_AGENT_LITELLM_PROXY_PORT=4000
       - CLAUDE_AGENT_NOTEPLAN_DIR=/noteplan
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # SDK stream close timeout: default 60s kills multi-tool queries (see CLAUDE.md gotcha #3)
+      # Set to 30 min — API response times are slow with subscription-tier rate limits
+      - CLAUDE_CODE_STREAM_CLOSE_TIMEOUT=1800000
     volumes:
       # Claude CLI config + auth (persistent named volume, writable)
       - claude_agent_config:/home/agent/.claude

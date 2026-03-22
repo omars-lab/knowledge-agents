@@ -67,7 +67,7 @@ def run_test_case(case: dict) -> dict:
             response = requests.post(
                 f"{AGENT_BASE_URL}/api/v1/chat",
                 json=payload,
-                timeout=180,
+                timeout=300,
             )
             response.raise_for_status()
             data = response.json()
