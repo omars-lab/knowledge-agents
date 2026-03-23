@@ -71,7 +71,19 @@ make claude-agent-logs      # View logs
 make claude-agent-test      # Run unit tests
 make claude-agent-eval      # Run eval suite
 make claude-agent-chat MSG="query"  # Quick chat test
+make claude-agent-graph             # Render full knowledge graph as SVG
+make claude-agent-graph ENTITY="X"  # Render connections for entity X
+make claude-agent-auth-seed         # Refresh auth from host keychain
+make claude-agent-auth-status       # Check auth + token expiry
+
+# LM Studio (embedding infrastructure on Mac Studio)
+make lm-studio-status       # Check server, loaded models, API
+make lm-studio-load-embeddings  # Load embedding model
+make lm-studio-test-embedding   # Test embedding pipeline
 ```
+
+### Claude Code Skills
+- `/knowledge <query>` — Query notes, build graphs, visualize connections via the Claude Agent
 
 ## Coding Rules
 

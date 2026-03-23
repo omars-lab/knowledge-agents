@@ -1,159 +1,118 @@
-# Refactor Eval Framework to Anthropic Success Criteria Patterns
+# Claude Agent Interaction Experience: Subagent + Docs + On-Demand Graphs
 
 ## Context
 
-Current eval framework is a functional smoke test: it checks tool invocation (substring match) and keyword presence in output. It passes 10/10 but doesn't measure **response quality, factual correctness, context retention, latency, or cost efficiency**. The `grading` field in test cases is documentation-only — never evaluated.
+The Claude Agent is fully functional (container, API, tools, evals) but has no user-facing interaction surface beyond `curl` and `make claude-agent-chat`. It's not documented in the README, can't be invoked from Claude Code, and has no graph visualization.
 
-Anthropic's eval guidance recommends: specific/measurable criteria, LLM-based grading for nuanced quality, code-based grading for deterministic checks, and volume over perfection.
+**Goal:** Make the Claude Agent usable from Claude Code as a `/knowledge` skill, add on-demand SVG graph rendering, and update the README.
 
-**Goal:** Upgrade the eval framework to measure what actually matters while keeping it fast and automated.
-
-## Current Gaps (prioritized)
-
-1. **No response quality scoring** — answers could be hallucinated and we'd never know
-2. **Context retention is binary** — checks session_id exists, not if context was used
-3. **No latency tracking** — can't detect performance regressions
-4. **No error categorization** — timeouts, auth failures, and tool errors all lumped as "error"
-5. **Grading config is dead code** — test cases have `grading` field but scorer ignores it
+**User decisions:**
+- Primary interface: **Claude Code subagent** (invoke via `/knowledge` skill)
+- SVG graphs: **On-demand** (only when explicitly requested)
 
 ## Plan
 
-### Step 1: Add LLM-based response quality grading to scorer
+### Step 1: Create `/knowledge` Claude Code skill
 
-**File:** `evals/claude_agent/scorer.py`
+**File:** `.claude/skills/knowledge.md`
 
-Add a new `response_quality` dimension that uses Claude (via the Anthropic SDK) to grade responses on a 1-5 Likert scale. The grading prompt uses the test case's `grading` rubric (which already exists in every test case but is currently unused).
+A user-invocable skill that proxies queries to the Claude Agent API. When invoked:
+1. Checks if the claude-agent container is running (health check)
+2. Sends the user's query to `POST /api/v1/chat`
+3. Displays the response (tools used, answer, cost)
+4. If the user asks for a graph, calls a graph rendering step (Step 2)
+5. Maintains session_id across follow-up invocations
 
-```python
-def _grade_with_llm(output: str, grading: dict[str, str], input_text: str) -> float:
-    """Use Claude to grade response quality on a 1-5 scale."""
-    rubric = "\n".join(f"- {k}: {v}" for k, v in grading.items())
-    prompt = f"""Rate this agent response on a scale of 1-5 based on these criteria:
-{rubric}
-
-User query: {input_text}
-Agent response: {output}
-
-Output only a JSON object: {{"score": <1-5>, "reasoning": "<brief explanation>"}}"""
-
-    # Call Claude API directly (not via the agent SDK)
-    response = anthropic_client.messages.create(
-        model="claude-haiku-4-5-20251001",  # cheap/fast for grading
-        max_tokens=200,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    # Parse score, normalize to 0.0-1.0
+Usage patterns:
+```
+/knowledge what notes do I have about AI projects?
+/knowledge read Calendar/20251218.md and summarize it
+/knowledge build a knowledge graph from my recent notes
+/knowledge show me a graph of entities related to "machine learning"
 ```
 
-Use `claude-haiku-4-5-20251001` for grading — cheap, fast, good enough for Likert scales. Only run LLM grading when `grading` config exists in the test case.
+The skill instructs Claude Code to:
+- Call the agent API via curl
+- Parse the JSON response
+- Display the answer text
+- If graph data is present or requested, invoke the SVG renderer
 
-**Scoring:** Score 1→0.0, 2→0.25, 3→0.5, 4→0.75, 5→1.0
+### Step 2: Add SVG graph rendering tool
 
-### Step 2: Add latency and cost tracking to scorer
+**File:** `scripts/render_graph.py`
 
-**File:** `evals/claude_agent/scorer.py`
-
-Add `latency` and `cost` dimensions that track absolute values (not pass/fail). These are informational metrics stored in results for regression detection.
-
-```python
-# In score_response():
-if result.get("total_duration_ms"):
-    scores["latency_ms"] = result["total_duration_ms"]  # raw value, not 0-1
-if result.get("total_cost_usd"):
-    scores["cost_usd"] = result["total_cost_usd"]  # raw value, not 0-1
-```
-
-Exclude these from the `overall` average (they're not 0-1 scores).
-
-### Step 3: Categorize errors in runner
-
-**File:** `evals/claude_agent/runner.py`
-
-Replace the generic `error` field with structured error categorization:
-
-```python
-except requests.Timeout:
-    results["error"] = {"type": "timeout", "message": "..."}
-except requests.HTTPError as e:
-    status = e.response.status_code
-    if status == 503:
-        results["error"] = {"type": "transport_error", "message": "..."}
-    elif status == 401:
-        results["error"] = {"type": "auth_error", "message": "..."}
-    else:
-        results["error"] = {"type": "http_error", "status": status, "message": "..."}
-except Exception as e:
-    results["error"] = {"type": "unknown", "message": str(e)}
-```
-
-### Step 4: Add context retention scoring for multi-turn
-
-**File:** `evals/claude_agent/scorer.py`
-
-For multi-turn cases (`session_maintained: true`), use LLM grading to check if later turns actually reference content from earlier turns:
-
-```python
-def _grade_context_retention(turns: list[dict]) -> float:
-    """LLM grades whether later turns use context from earlier turns."""
-    if len(turns) < 2:
-        return 1.0
-    # Build conversation transcript, ask Claude to rate context usage 1-5
-```
-
-### Step 5: Upgrade report with richer metrics
-
-**File:** `evals/claude_agent/report.py`
-
-Add to the markdown report:
-- Per-case latency and cost columns
-- Error breakdown by type (timeout, transport, auth, http)
-- Response quality scores (when LLM grading is available)
-- Comparison with previous run (if a prior result file exists)
-
-### Step 6: Add edge case test cases
-
-**Files:** `evals/claude_agent/datasets/*.json`
-
-Add edge cases to existing datasets:
-- `note_search.json`: Add `read-004` with a nonexistent file path (expects graceful error handling)
-- `tool_selection.json`: Add `tool-004` with an ambiguous query (tests tool reasoning)
-- `graph_building.json`: Add `graph-003` with an empty note (expects graceful "no entities found")
-
-### Step 7: Add ANTHROPIC_API_KEY config for LLM grading
-
-**File:** `evals/claude_agent/scorer.py`, `evals/claude_agent/runner.py`
-
-LLM grading needs an Anthropic API key. Use `ANTHROPIC_API_KEY` from environment (already used by the container). Add `--llm-grading` flag to runner to enable/disable (disabled by default for speed).
+A standalone Python script that queries Neo4j and renders an SVG using `graphviz` (or `pyvis` for interactive HTML). Called on-demand when the user asks for a visualization.
 
 ```bash
-# Fast run (code-based grading only)
-python -m evals.claude_agent.runner
-
-# Full run with LLM quality grading
-python -m evals.claude_agent.runner --llm-grading
+python scripts/render_graph.py \
+  --query "MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 50" \
+  --output build/graphs/knowledge-graph.svg \
+  --format svg
 ```
+
+Features:
+- Accepts a Cypher query or entity name as input
+- Renders nodes (color-coded by type: Person, Project, Topic, etc.)
+- Renders edges with relationship labels
+- Outputs SVG (viewable in browser, embeddable) or HTML (interactive)
+- Saves to `build/graphs/` with timestamped filenames
+
+Dependencies: `graphviz` Python package (lightweight, no JS needed for SVG)
+
+### Step 3: Add graph rendering as a Makefile target
+
+**File:** `Makefile`
+
+```makefile
+claude-agent-graph: ## Render knowledge graph as SVG (usage: make claude-agent-graph QUERY="entity name or cypher")
+	python scripts/render_graph.py --query "$(QUERY)" --output build/graphs/latest.svg
+	open build/graphs/latest.svg
+```
+
+### Step 4: Wire graph rendering into the `/knowledge` skill
+
+**File:** `.claude/skills/knowledge.md`
+
+When the user says "show me a graph" or "visualize", the skill:
+1. Asks the agent to run a `query_knowledge_graph` call to get relevant entities
+2. Passes the Cypher result to `scripts/render_graph.py`
+3. Saves SVG to `build/graphs/{topic}-{date}.svg`
+4. Shows the user the file path (Claude Code can display the image)
+
+### Step 5: Update README.md
+
+**File:** `README.md`
+
+Add a new section documenting the Claude Agent:
+- What it does (2-3 sentences)
+- Quick start (`make claude-agent-up && make claude-agent-auth-seed`)
+- How to use from Claude Code (`/knowledge`)
+- How to use via curl
+- API endpoints table
+- Available tools
+- Graph visualization
+- Link to `docs/CLAUDE_AGENT_ARCHITECTURE.md` for details
+
+### Step 6: Update CLAUDE.md commands section
+
+**File:** `CLAUDE.md`
+
+Add the `/knowledge` skill and graph rendering commands to the Key Commands section.
 
 ## Critical Files
 
 | File | Change |
 |------|--------|
-| `evals/claude_agent/scorer.py` | LLM grading, latency/cost tracking, context retention |
-| `evals/claude_agent/runner.py` | Error categorization, --llm-grading flag |
-| `evals/claude_agent/report.py` | Richer metrics table, error breakdown |
-| `evals/claude_agent/datasets/*.json` | Edge case test cases |
-| `requirements-claude-agent.txt` | Add `anthropic` package for LLM grading |
+| `.claude/skills/knowledge.md` | New: user-invocable `/knowledge` skill |
+| `scripts/render_graph.py` | New: SVG graph renderer from Neo4j |
+| `Makefile` | Add `claude-agent-graph` target |
+| `README.md` | Add Claude Agent documentation section |
+| `CLAUDE.md` | Add new commands |
 
 ## Verification
 
-1. Unit tests: `conda run -n knowledge-agents pytest tst/unit/claude_agent/ -v -m unit`
-2. Fast eval (no LLM grading): `python -m evals.claude_agent.runner`
-3. Full eval with grading: `ANTHROPIC_API_KEY=... python -m evals.claude_agent.runner --llm-grading`
-4. Report: `python -m evals.claude_agent.report` — verify new columns appear
-5. Edge cases: verify graceful error handling, not crashes
-
-## Design Decisions
-
-- **Haiku for grading, not Opus** — 10x cheaper, fast enough for Likert scales, different model than the one being evaluated (best practice)
-- **LLM grading opt-in** — default runs are fast/free (code-based only), `--llm-grading` adds quality scoring at ~$0.001/case
-- **Latency/cost as raw values** — not normalized to 0-1, excluded from overall score, used for regression tracking
-- **Grading rubrics reuse existing `grading` field** — no test case changes needed for LLM grading to work
+1. Test skill: `/knowledge read Calendar/20251218.md and summarize it`
+2. Test graph: `make claude-agent-graph QUERY="MATCH (n:Entity) RETURN n LIMIT 20"`
+3. Test from Claude Code: invoke `/knowledge` and verify response
+4. Verify README renders correctly
+5. Unit tests still pass: `make claude-agent-test`

@@ -27,6 +27,56 @@ Knowledge-agents is a production-ready system for querying and managing personal
 - **⚡ Usage Tracking**: Configurable token usage reporting with detailed metadata in response headers
 - **🔧 Modular Architecture**: Clean separation of concerns with well-organized utility modules
 
+## Claude Agent (Interactive Knowledge Agent)
+
+A multi-turn conversational agent powered by the Claude Agent SDK that lets you explore, read, and build connections across your NotePlan notes. Runs as a dedicated Docker container.
+
+### Quick Start
+
+```bash
+make claude-agent-up              # Start container + dependencies
+make claude-agent-auth-seed       # Seed auth from host keychain
+make claude-agent-chat MSG="Read Calendar/20251218.md and summarize it"
+```
+
+### Use from Claude Code
+
+Invoke the `/knowledge` skill:
+```
+/knowledge what notes do I have about AI projects?
+/knowledge read Calendar/20251218.md and build a knowledge graph
+/knowledge show me a graph of entities related to "machine learning"
+```
+
+### Available Tools
+
+| Tool | Purpose |
+|------|---------|
+| `read_note` | Read NotePlan markdown files |
+| `build_knowledge_graph` | Extract entities/relationships to Neo4j |
+| `query_knowledge_graph` | Execute Cypher queries against the graph |
+| `derive_xcallback_url` | Generate NotePlan app links |
+
+### Graph Visualization
+
+Render the knowledge graph as SVG:
+```bash
+make claude-agent-graph                           # Full graph
+make claude-agent-graph ENTITY="machine learning" # Entity connections
+```
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Health check |
+| `/api/v1/chat` | POST | Buffered chat response |
+| `/api/v1/chat/stream` | POST | Streaming SSE response |
+| `/api/v1/sessions` | GET | List sessions |
+| `/api/v1/sessions/{id}` | DELETE | Close session |
+
+See [Claude Agent Architecture](docs/CLAUDE_AGENT_ARCHITECTURE.md) for full details.
+
 ## Setup Instructions
 
 **Before running anything, you MUST provide your LiteLLM proxy API key:**

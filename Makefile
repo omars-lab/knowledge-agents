@@ -600,6 +600,18 @@ lm-studio-test-embedding: ## Test embedding generation end-to-end
 lm-studio-ls: ## List all downloaded models
 	@./scripts/lm_studio_ctl.sh ls --remote $(LMS_SSH_HOST)
 
+claude-agent-graph: ## Render knowledge graph as SVG (usage: make claude-agent-graph QUERY="entity name" or CYPHER="match query")
+	@mkdir -p build/graphs
+	@if [ -n "$(ENTITY)" ]; then \
+		conda run -n $(conda-env-name) python scripts/render_graph.py --entity "$(ENTITY)" --output build/graphs/latest.svg; \
+	elif [ -n "$(CYPHER)" ]; then \
+		conda run -n $(conda-env-name) python scripts/render_graph.py --query "$(CYPHER)" --output build/graphs/latest.svg; \
+	else \
+		conda run -n $(conda-env-name) python scripts/render_graph.py --all --output build/graphs/latest.svg; \
+	fi
+	@echo "📊 Opening graph..."
+	@open build/graphs/latest.svg 2>/dev/null || echo "  Open: build/graphs/latest.svg"
+
 claude-agent-chat: ## Quick test of Claude Agent chat (usage: make claude-agent-chat MSG="your question")
 	@if [ -z "$(MSG)" ]; then echo "❌ Please provide MSG=\"your question\""; exit 1; fi
 	@echo "💬 Sending message to Claude Agent: $(MSG)"
