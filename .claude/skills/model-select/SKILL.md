@@ -101,16 +101,47 @@ Only include benchmark data for models confirmed available in LM Studio catalog.
 For each candidate model, evaluate:
 
 1. **Size vs RAM**: Model size (quantized) must fit with other models you need loaded
-   - Q4_K_M quantization ≈ ~60% of full model size
-   - Rule of thumb: `params * 0.6 GB` for Q4_K_M
+   - Rule of thumb: `params * 0.6 GB` for Q4_K_M, `params * 1.0 GB` for Q8_0
+   - Leave 25% RAM free for OS + inference buffers
 
 2. **Quality vs speed trade-off**:
    - More parameters = better quality but slower
-   - MoE models (e.g., Qwen3-30B-A3B) have high quality with fast inference (only active params matter)
+   - MoE models (e.g., Qwen3.5-35B-A3B) have high quality with fast inference (only active params matter)
 
-3. **Quantization**: For Mac Studio with 96GB, prefer Q4_K_M or Q5_K_M (good quality/size balance)
+3. **Quantization** — pick based on RAM budget:
 
-4. **Context window**: Longer context = more RAM. 8K context is usually sufficient for note sections.
+   | Quantization | Quality Retention | Size vs FP16 | When to use |
+   |-------------|------------------|--------------|-------------|
+   | **Q8_0** | ~99% | ~50% | Have lots of RAM, want near-lossless |
+   | **Q6_K** | ~98% | ~43% | Good RAM headroom, quality-sensitive tasks |
+   | **Q5_K_M** | ~95% | ~37% | Sweet spot when RAM allows |
+   | **Q4_K_M** | ~92% | ~30% | **Default choice** — best quality/size balance |
+   | **Q3_K_M** | ~85% | ~25% | Tight on RAM, still usable |
+   | **IQ2_M** | ~75% | ~18% | Extreme compression, noticeable quality loss |
+
+   **For our Mac Studio (96GB):** Use Q5_K_M or Q4_K_M. We have plenty of RAM so prefer Q5_K_M for slightly better quality. Only drop to Q4_K_M if loading multiple large models simultaneously.
+
+   **How to check available quantizations:**
+   ```bash
+   # lms get shows available variants when you specify model@quantization
+   ssh mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' get '<model>@q5_k_m' --quiet 2>&1" | head -5
+   ```
+
+4. **Runtime framework** (GGUF vs MLX):
+
+   | Framework | Format | Speed on Apple Silicon | Availability |
+   |-----------|--------|----------------------|-------------|
+   | **GGUF** (llama.cpp) | `.gguf` | Baseline | Most models available |
+   | **MLX** (Apple native) | `.safetensors` | **20-30% faster** | Fewer models, growing |
+
+   **Recommendation:** Prefer GGUF for compatibility (LM Studio uses llama.cpp backend). Consider MLX variants (`mlx-community/` prefix in catalog) if available for your model — they're faster on Apple Silicon but may have fewer quantization options.
+
+   **How to search MLX variants:**
+   ```bash
+   ssh mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' get '<model>' --mlx --quiet 2>&1" | head -10
+   ```
+
+5. **Context window**: Longer context = more RAM. 8K context is usually sufficient for note sections. 32K+ contexts can add 2-4 GB of RAM usage.
 
 ### Step 8: Present Recommendation
 
