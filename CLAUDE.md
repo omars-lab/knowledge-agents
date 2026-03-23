@@ -119,7 +119,7 @@ Rules:
 
 When discovering non-obvious gotchas, limitations, or workarounds during implementation, document them immediately in this section. These are things that are not derivable from the code alone and will save future debugging time.
 
-### Claude Agent SDK Gotchas
+### Gotchas (Living Section — add new entries as discovered)
 
 1. **`@tool()` decorator returns `SdkMcpTool`, not a callable.** To call tool handlers in tests, use `.handler`: `await my_tool.handler(args)`, not `await my_tool(args)`.
 
@@ -136,6 +136,10 @@ When discovering non-obvious gotchas, limitations, or workarounds during impleme
 7. **LiteLLM healthcheck script takes 60s with `--location` flag + API key.** Use `/health/liveliness` endpoint instead of the complex healthcheck script for Docker healthchecks.
 
 8. **Claude API rate limiting causes silent waits, not errors.** The CLI auto-retries 429s with backoff. This manifests as 60-300s response times, not error messages. The SDK emits `RateLimitEvent` with `status` (allowed/allowed_warning/rejected) and `utilization` %. The agent logs these at INFO/WARNING level. The eval runner has `--delay` (seconds between cases, default 3) and `--timeout` (seconds per request, default 300) to manage pacing.
+
+9. **Docker compose env changes require `--force-recreate`, not just restart.** Changing `docker-compose.yml` environment variables (e.g., `LM_STUDIO_HOST`) then running `docker compose up -d` does NOT update running containers. You must use `docker compose up -d --force-recreate <service>` to pick up env var changes. Symptom: container still uses old values (check with `docker exec <container> env | grep VAR`).
+
+10. **LiteLLM proxy config references are resolved at container start, not at request time.** If the LM Studio IP changes (DHCP) or you switch from IP to hostname, the LiteLLM proxy must be recreated. The config file (`config/litellm_config.yaml`) may also cache the host — check both `docker-compose.yml` env vars AND the config file.
 
 ## Testing Rules
 
