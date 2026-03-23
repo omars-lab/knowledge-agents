@@ -139,7 +139,7 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - LM_STUDIO_HOST=${LM_STUDIO_HOST:-192.168.1.168}
+      - LM_STUDIO_HOST=${LM_STUDIO_HOST:-192.168.1.131}
       - LM_STUDIO_PORT=${LM_STUDIO_PORT:-1234}
       - LITELLM_PORT=4000
       - LITELLM_HOST=0.0.0.0

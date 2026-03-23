@@ -583,6 +583,23 @@ claude-agent-clean-sessions: ## Clean up old session workspaces
 	@rm -rf build/sessions/*
 	@echo "✅ Session workspaces cleaned"
 
+LMS_SSH_HOST ?= mac-studio
+
+lm-studio-status: ## Check LM Studio status (local or remote via LMS_SSH_HOST)
+	@./scripts/lm_studio_ctl.sh status --remote $(LMS_SSH_HOST)
+
+lm-studio-status-local: ## Check LM Studio status (local machine)
+	@./scripts/lm_studio_ctl.sh status
+
+lm-studio-load-embeddings: ## Load the embedding model (remote via LMS_SSH_HOST)
+	@./scripts/lm_studio_ctl.sh load-embeddings --remote $(LMS_SSH_HOST)
+
+lm-studio-test-embedding: ## Test embedding generation end-to-end
+	@./scripts/lm_studio_ctl.sh test-embedding --remote $(LMS_SSH_HOST)
+
+lm-studio-ls: ## List all downloaded models
+	@./scripts/lm_studio_ctl.sh ls --remote $(LMS_SSH_HOST)
+
 claude-agent-chat: ## Quick test of Claude Agent chat (usage: make claude-agent-chat MSG="your question")
 	@if [ -z "$(MSG)" ]; then echo "❌ Please provide MSG=\"your question\""; exit 1; fi
 	@echo "💬 Sending message to Claude Agent: $(MSG)"
