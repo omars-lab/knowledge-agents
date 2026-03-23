@@ -204,6 +204,7 @@ These documents must be kept up to date as features are added or changed:
 - **`docs/GRAPH_SCHEMA.md`** -- When adding node types, relationship types, link resolution rules, or entity properties
 - **`docs/OBSERVABILITY.md`** -- When adding metrics, changing log format, or modifying the observability stack
 - **`docs/TECH_DESIGN.md`** -- When making architecture decisions, changing models, or modifying infrastructure
+- **`docs/SECTION_INDEXING_PIPELINE.md`** -- When changing the section indexing pipeline, models, storage schema, or CLI flags
 - **`CLAUDE.md`** -- When adding new commands, conventions, or architectural patterns
 - **`DEVELOPMENT.md`** -- When changing build/test workflows or architecture
 - **`README.md`** -- When changing setup instructions or project overview
