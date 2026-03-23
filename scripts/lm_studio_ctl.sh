@@ -111,12 +111,41 @@ print(f'✅ OK: {dim} dimensions (model: {d.get(\"model\", \"?\")})')
         run_cmd "'$LMS_CLI' ps"
         ;;
 
+    load-model)
+        MODEL_NAME="${2:-}"
+        if [ -z "$MODEL_NAME" ]; then
+            echo "❌ Usage: $0 load-model [--remote HOST] <model-path>"
+            echo "   Example: $0 load-model --remote mac-studio 'mistralai/ministral-3-14b-reasoning'"
+            exit 1
+        fi
+        echo "🚀 Loading model: $MODEL_NAME"
+        run_cmd "'$LMS_CLI' load --yes '$MODEL_NAME'" | grep -v '^\[' | tail -5 || echo "❌ Failed to load"
+        echo ""
+        echo "📦 Loaded models:"
+        run_cmd "'$LMS_CLI' ps"
+        ;;
+
+    unload-model)
+        MODEL_NAME="${2:-}"
+        if [ -z "$MODEL_NAME" ]; then
+            echo "❌ Usage: $0 unload-model [--remote HOST] <model-identifier>"
+            exit 1
+        fi
+        echo "🛑 Unloading model: $MODEL_NAME"
+        run_cmd "'$LMS_CLI' unload --yes '$MODEL_NAME'" || echo "❌ Failed to unload"
+        echo ""
+        echo "📦 Loaded models:"
+        run_cmd "'$LMS_CLI' ps"
+        ;;
+
     help|*)
         echo "Usage: $0 <command> [--remote HOST]"
         echo ""
         echo "Commands:"
         echo "  status           Check LM Studio server, loaded models, and API"
         echo "  load-embeddings  Load the embedding model"
+        echo "  load-model NAME  Load a specific model by path"
+        echo "  unload-model ID  Unload a specific model"
         echo "  test-embedding   Test embedding generation end-to-end"
         echo "  ls               List all downloaded models"
         echo "  ps               List currently loaded models"
