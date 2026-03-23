@@ -32,44 +32,16 @@ except ImportError:
     print("Also need system graphviz: brew install graphviz")
     sys.exit(1)
 
-import requests as http_requests
 from neo4j import GraphDatabase
 
-
-# Entity type → color mapping
-TYPE_COLORS = {
-    "Person": "#4A90D9",
-    "Project": "#50C878",
-    "Topic": "#FFB347",
-    "Concept": "#DDA0DD",
-    "Date": "#87CEEB",
-    "Location": "#F0E68C",
-    "Organization": "#FF6B6B",
-    "Tool": "#98D8C8",
-    "Event": "#C9B1FF",
-    "Note": "#FFF3CD",
-    "Task": "#FFD6D6",
-}
-DEFAULT_COLOR = "#D3D3D3"
-
-TIDY_MCP_URL = "http://localhost:8003"
-
-
-def _get_xcallback_url(file_path: str) -> str | None:
-    """Get a noteplan:// xcallback URL for a file path via tidy-mcp."""
-    try:
-        resp = http_requests.post(
-            f"{TIDY_MCP_URL}/tools/derive_xcallback_url_from_noteplan_file",
-            json={"file_path": file_path},
-            timeout=5,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("success"):
-            return data["x_callback_url"]
-    except Exception:
-        pass
-    return None
+# Add project src to path for link_resolver import
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from knowledge_agents.claude_agent.link_resolver import (
+    NODE_SCHEMA,
+    get_color,
+    get_shape,
+    resolve_link,
+)
 
 
 def query_neo4j(driver, database, cypher):
@@ -81,8 +53,8 @@ def query_neo4j(driver, database, cypher):
 
 def build_entity_graph(driver, database, entity_name, limit=50):
     """Get all connections for a specific entity."""
-    cypher = """
-    MATCH (e:Entity {name: $name})-[r]-(connected)
+    cypher = f"""
+    MATCH (e:Entity {{name: '{entity_name}'}})-[r]-(connected)
     RETURN e.name AS from_name, e.type AS from_type,
            type(r) AS rel_type,
            CASE WHEN connected:Entity THEN connected.name
@@ -90,10 +62,12 @@ def build_entity_graph(driver, database, entity_name, limit=50):
                 ELSE 'unknown' END AS to_name,
            CASE WHEN connected:Entity THEN connected.type
                 WHEN connected:Note THEN 'Note'
-                ELSE 'unknown' END AS to_type
-    LIMIT $limit
+                ELSE 'unknown' END AS to_type,
+           properties(e) AS from_props,
+           properties(connected) AS to_props
+    LIMIT {limit}
     """
-    return query_neo4j(driver, database, cypher.replace("$name", f"'{entity_name}'").replace("$limit", str(limit)))
+    return query_neo4j(driver, database, cypher)
 
 
 def build_all_graph(driver, database, limit=50):
@@ -106,7 +80,9 @@ def build_all_graph(driver, database, limit=50):
         CASE WHEN n:Note THEN 'Note' ELSE n.type END AS from_type,
         type(r) AS rel_type,
         CASE WHEN m:Note THEN m.file_path ELSE m.name END AS to_name,
-        CASE WHEN m:Note THEN 'Note' ELSE m.type END AS to_type
+        CASE WHEN m:Note THEN 'Note' ELSE m.type END AS to_type,
+        properties(n) AS from_props,
+        properties(m) AS to_props
     LIMIT {limit}
     """
     return query_neo4j(driver, database, cypher)
@@ -169,47 +145,57 @@ def render_svg(records, output_path, fmt="svg", title=None):
         },
     )
 
-    # Collect unique nodes
-    nodes = {}
+    # Collect unique nodes with their properties for link resolution
+    nodes: dict[str, dict] = {}  # name → {type, props}
     for r in records:
         if r.get("from_name"):
-            nodes[r["from_name"]] = r.get("from_type", "Entity")
+            props = dict(r.get("from_props", {}) or {})
+            props["name"] = r["from_name"]
+            if r.get("from_type") == "Note":
+                props["file_path"] = r["from_name"]
+            nodes[r["from_name"]] = {"type": r.get("from_type", "Entity"), "props": props}
         if r.get("to_name"):
-            nodes[r["to_name"]] = r.get("to_type", "Entity")
+            props = dict(r.get("to_props", {}) or {})
+            props["name"] = r["to_name"]
+            if r.get("to_type") == "Note":
+                props["file_path"] = r["to_name"]
+            nodes[r["to_name"]] = {"type": r.get("to_type", "Entity"), "props": props}
 
-    # Resolve xcallback URLs for Note nodes
-    note_urls: dict[str, str] = {}
-    note_nodes = [n for n, t in nodes.items() if t == "Note"]
-    for file_path in note_nodes:
-        url = _get_xcallback_url(file_path)
-        if url:
-            note_urls[file_path] = url
-
-    # Add nodes
-    for name, node_type in nodes.items():
-        color = TYPE_COLORS.get(node_type, DEFAULT_COLOR)
+    # Add nodes with schema-driven colors, shapes, and links
+    for name, info in nodes.items():
+        node_type = info["type"]
+        props = info["props"]
+        color = get_color(node_type)
+        shape = get_shape(node_type)
+        url = resolve_link(node_type, props)
 
         if node_type == "Note":
-            # Note nodes: distinct shape, short label, clickable noteplan:// link
-            short_name = Path(name).stem  # "20251218" or "Ideas"
-            label = f"📄 {short_name}"
+            short_name = Path(name).stem
+            label = f"\U0001f4c4 {short_name}"
             attrs = {
                 "label": label,
                 "fillcolor": color,
-                "shape": "note",
+                "shape": shape,
                 "style": "filled",
                 "fontsize": "11",
                 "penwidth": "2",
                 "color": "#B8860B",
                 "tooltip": name,
             }
-            if name in note_urls:
-                attrs["URL"] = note_urls[name]
-                attrs["target"] = "_blank"
-            dot.node(name, **attrs)
         else:
             label = f"{name}\n({node_type})" if node_type and node_type != "Entity" else name
-            dot.node(name, label=label, fillcolor=color)
+            attrs = {
+                "label": label,
+                "fillcolor": color,
+                "shape": shape,
+                "style": "rounded,filled",
+            }
+
+        if url:
+            attrs["URL"] = url
+            attrs["target"] = "_blank"
+
+        dot.node(name, **attrs)
 
     # Add edges
     for r in records:

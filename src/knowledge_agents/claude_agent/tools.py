@@ -265,14 +265,22 @@ async def read_note(args: dict[str, Any]) -> dict[str, Any]:
             },
             "entities": {
                 "type": "array",
-                "description": "Entities extracted from the note",
+                "description": "Entities extracted from the note. Include link metadata when available.",
                 "items": {
                     "type": "object",
                     "properties": {
                         "name": {"type": "string"},
                         "type": {
                             "type": "string",
-                            "description": "Entity type: Person, Project, Topic, Concept, Date, Location, etc.",
+                            "description": "Entity type: Person, Project, Topic, Concept, Date, Location, Organization, Tool, Event, Task",
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "External URL for this entity (website, docs, profile). Optional.",
+                        },
+                        "properties": {
+                            "type": "object",
+                            "description": "Additional metadata: email, repo, date (YYYY-MM-DD), role, status, note_file_path. Optional.",
                         },
                     },
                     "required": ["name", "type"],
@@ -290,6 +298,10 @@ async def read_note(args: dict[str, Any]) -> dict[str, Any]:
                             "type": "string",
                             "description": "RELATED_TO, WORKS_ON, MENTIONS, REFERENCES, OCCURS_AT, BELONGS_TO, PART_OF, CONTAINS",
                         },
+                        "properties": {
+                            "type": "object",
+                            "description": "Edge metadata: context, role. Optional.",
+                        },
                     },
                     "required": ["from_entity", "to_entity", "type"],
                 },
@@ -305,18 +317,27 @@ async def build_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
     raw_relationships = args.get("relationships", [])
 
     try:
-        entities = [
-            Entity(name=e["name"], type=e["type"]) for e in raw_entities if e.get("name")
-        ]
-        relationships = [
-            Relationship(
+        entities = []
+        for e in raw_entities:
+            if not e.get("name"):
+                continue
+            # Merge url + extra properties into the properties dict
+            props = dict(e.get("properties", {}) or {})
+            if e.get("url"):
+                props["url"] = e["url"]
+            entities.append(Entity(name=e["name"], type=e["type"], properties=props))
+
+        relationships = []
+        for r in raw_relationships:
+            if not (r.get("from_entity") and r.get("to_entity")):
+                continue
+            props = dict(r.get("properties", {}) or {})
+            relationships.append(Relationship(
                 from_entity=r["from_entity"],
                 to_entity=r["to_entity"],
                 type=r["type"],
-            )
-            for r in raw_relationships
-            if r.get("from_entity") and r.get("to_entity")
-        ]
+                properties=props,
+            ))
 
         agent_output = GraphBuilderAgentOutput(
             entities=entities, relationships=relationships
@@ -326,6 +347,18 @@ async def build_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
             create_graph_nodes_and_relationships,
             _neo4j_driver, file_path, agent_output, _settings.neo4j_database,
         )
+
+        # Store xcallback URL on the Note node
+        from .link_resolver import resolve_link
+        xcallback = resolve_link("Note", {"file_path": file_path})
+        if xcallback:
+            def _set_xcallback():
+                with _neo4j_driver.session(database=_settings.neo4j_database) as session:
+                    session.run(
+                        "MATCH (n:Note {file_path: $fp}) SET n.xcallback_url = $url",
+                        fp=file_path, url=xcallback,
+                    )
+            await asyncio.to_thread(_set_xcallback)
 
         summary = (
             f"Knowledge graph updated for '{file_path}': "

@@ -18,12 +18,21 @@ Read the full content of a NotePlan file.
 
 ### build_knowledge_graph
 Store extracted entities and relationships in Neo4j.
-- First read note content, then extract entities (people, projects, topics, concepts, \
-locations, dates) and relationships from the text
+- First read note content, then extract entities and relationships from the text
 - Call this tool with the structured entities and relationships you extracted
-- Entity types: Person, Project, Topic, Concept, Date, Location, Organization, Tool, Event
+- Entity types: Person, Project, Topic, Concept, Date, Location, Organization, Tool, Event, Task
 - Relationship types: RELATED_TO, WORKS_ON, MENTIONS, REFERENCES, OCCURS_AT, \
 BELONGS_TO, PART_OF, CONTAINS
+
+When extracting entities, include link metadata in the `properties` field:
+- Person: `email`, `url` (LinkedIn/website), `role`
+- Project: `repo` (GitHub slug like "owner/repo"), `url` (project page)
+- Tool: `url` (homepage or docs)
+- Organization: `url` (website)
+- Event: `date` (YYYY-MM-DD format), `url` (event page)
+- Date: `date` (YYYY-MM-DD format)
+- Task: `status` (done/pending), `note_file_path` (file containing the task)
+- Any entity: `url` if an external link is explicitly mentioned in the note
 
 ### query_knowledge_graph
 Execute read-only Cypher queries against the Neo4j graph.
