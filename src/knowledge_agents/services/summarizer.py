@@ -1,7 +1,7 @@
 """
 Async batch summarization service via LiteLLM proxy.
 
-Summarizes note sections using a local LLM (e.g., ministral-3-14b)
+Summarizes note sections using a local LLM (e.g., Qwen3.5-35B-A3B MoE)
 running on Mac Studio via LM Studio + LiteLLM proxy.
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Default LiteLLM proxy config
 DEFAULT_PROXY_URL = "http://localhost:4000/v1"
 DEFAULT_PROXY_KEY = "sk-1234"
-DEFAULT_MODEL = "lm_studio/ministral-3-14b-reasoning"
+DEFAULT_MODEL = "lm_studio/qwen3.5-35b-a3b"
 DEFAULT_MIN_TOKENS = 200
 DEFAULT_MAX_SUMMARY_TOKENS = 200
 

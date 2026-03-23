@@ -142,22 +142,46 @@ To install and load:
 ssh mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' get '[model-name]' --yes"
 ssh mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' load --yes '[model-path]'"
 \`\`\`
+
+### Files to Update (MANDATORY after model change)
+After changing a model, update ALL of these:
+\`\`\`
+config/litellm_config.yaml           — Add model route (model_name + litellm_params)
+src/knowledge_agents/services/summarizer.py — DEFAULT_MODEL (for summarization)
+scripts/seed_sections.py              — --summarize-model default in argparse
+docs/MODEL_DECISIONS.md               — Add decision entry with rationale + links
+docs/TECH_DESIGN.md                   — Model section
+docs/SECTION_INDEXING_PIPELINE.md     — Model requirements table
+.claude/skills/model-select/SKILL.md  — Current Model Inventory table (this file)
+\`\`\`
+For embedding model changes, also update:
+\`\`\`
+src/knowledge_agents/claude_agent/config.py — litellm_proxy_embedding_model
+\`\`\`
+And re-index all Qdrant collections if dimensions change.
 ```
 
 ## Current Model Inventory
 
-Last updated: 2026-03-23
+Last updated: 2026-03-23. See `docs/MODEL_DECISIONS.md` for full decision log with links.
 
-| Model | Size | Type | Task | Notes |
-|-------|------|------|------|-------|
-| `text-embedding-qwen3-embedding-8b` | 4.68 GB | Embedding | Section/file embeddings | 4096 dims, primary embedding model |
-| `text-embedding-nomic-embed-text-v1.5` | 84 MB | Embedding | (backup) | 768 dims, fast but lower quality |
-| `ministral-3-14b-reasoning` | 9.12 GB | Chat | Summarization | Good for batch note summarization |
-| `openai/gpt-oss-20b` | 12.10 GB | Chat | General | Alternative summarization model |
-| `qwen/qwen3-coder-30b` | 17.19 GB | Code | Code generation | MoE, fast inference |
-| `mistralai/devstral-small-2-2512` | 14.12 GB | Code | Code generation | Coding-focused |
+**Active models (used by pipelines):**
 
-**Total installed:** 57.29 GB
+| Role | Model | Size | Key Metric |
+|------|-------|------|-----------|
+| **Embedding** | `text-embedding-qwen3-embedding-8b` | 4.68 GB | MTEB #1 (70.58) |
+| **Summarization** | `Qwen3.5-35B-A3B` (MoE) | ~20 GB | MMLU-Pro 85.3, 3B active |
+
+**Other installed models:**
+
+| Model | Size | Type | Notes |
+|-------|------|------|-------|
+| `text-embedding-nomic-embed-text-v1.5` | 84 MB | Embedding | Backup, 768 dims |
+| `ministral-3-14b-reasoning` | 9.12 GB | Chat | Previous summarization model |
+| `openai/gpt-oss-20b` | 12.10 GB | Chat | General |
+| `qwen/qwen3-coder-30b` | 17.19 GB | Code | MoE, fast inference |
+| `mistralai/devstral-small-2-2512` | 14.12 GB | Code | Coding-focused |
+
 **Hardware:** M3 Ultra, 96 GB unified memory
 
 ## Models Worth Investigating

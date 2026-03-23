@@ -215,8 +215,8 @@ When `--summarize` is enabled:
 
 | Phase | Model | Size | Purpose |
 |-------|-------|------|---------|
-| B (Summarize) | `ministral-3-14b-reasoning` | 9.12 GB | Section summarization |
-| C (Embed) | `text-embedding-qwen3-embedding-8b` | 4.68 GB | 4096-dim embeddings |
+| B (Summarize) | `Qwen3.5-35B-A3B` (MoE) | ~20 GB | Section summarization (3B active params, 85.3 MMLU-Pro) |
+| C (Embed) | `text-embedding-qwen3-embedding-8b` | 4.68 GB | 4096-dim embeddings (MTEB #1) |
 
 Check/load models:
 ```bash
@@ -250,7 +250,7 @@ Both use Qwen3-Embedding-8B with COSINE distance.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `Cannot connect to host 192.168.1.168` | LiteLLM has old LM Studio IP | `docker compose up -d --force-recreate llm-proxy` |
+| `Cannot connect to host` | LiteLLM proxy can't reach LM Studio | `make lm-studio-status` to verify, then `docker compose up -d --force-recreate llm-proxy` |
 | Embeddings hang/timeout | LM Studio not running or model not loaded | `make lm-studio-status && make lm-studio-load-embeddings` |
 | `0 sections to process` | All files already indexed (delta) | `make seed-sections-full` to force re-index |
 | Binary file warnings | Attachments (.jpg, etc.) in Notes | Normal — these are auto-skipped |

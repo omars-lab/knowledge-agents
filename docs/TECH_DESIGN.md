@@ -29,21 +29,27 @@
 - `nomic-embed-text-v1.5` (768 dims, 84MB) — too low dimensionality for fine-grained section search
 - `jina-embeddings-v5-text-small-retrieval` — state-of-art for retrieval but would require re-indexing everything; dimension mismatch with existing collection
 
-### Summarization: Ministral-3-14B-Reasoning
+### Summarization: Qwen3.5-35B-A3B (MoE)
 
 | Property | Value |
 |----------|-------|
-| Model | `ministral-3-14b-reasoning` |
-| Size | 9.12 GB |
+| Model | `lmstudio-community/Qwen3.5-35B-A3B-GGUF` |
+| Size | ~20 GB (Q4_K_M) |
+| Architecture | MoE — 35B total, 3B active per token |
+| MMLU-Pro | 85.3 |
 | Use case | Batch note summarization |
 | Concurrency | 3 parallel requests |
 
-**Why:** Fast enough for batch processing hundreds of sections. 14B parameters produce adequate summaries for personal notes. Reasoning variant helps with structured extraction.
+**Why:** MoE architecture gives 5x faster throughput than equivalent dense models while scoring 85.3 MMLU-Pro. Surpasses the previous-gen Qwen3-235B-A22B (22B active!) through better training. Perfect for batch summarization: high quality + fast inference.
+
+**Decision date:** 2026-03-23
+
+**Previous model:** `ministral-3-14b-reasoning` (9.12 GB, ~65 MMLU-Pro est.) — replaced due to being outdated generation. Qwen3.5-35B-A3B is ~30% better on benchmarks while only using 3B active params.
 
 **Alternatives considered:**
-- `Qwen3 30B A3B (MoE)` — only 3B active params at inference, potentially faster with better quality. Worth installing and benchmarking.
-- `openai/gpt-oss-20b` — slower, no meaningful quality gain for this task
-- Fine-tuned summarizers — over-specialized, lower general quality
+- `Qwen3.5-9B` (82.5 MMLU-Pro, ~6 GB) — strong alternative, smaller footprint, but lower quality
+- `Qwen3.5-27B` (higher MMLU, ~17 GB) — best quality but 5x slower than MoE variant
+- `ministral-3-14b-reasoning` (previous) — outdated generation, significantly lower benchmarks
 
 ### Claude Agent: Claude API (Opus/Sonnet via subscription)
 
