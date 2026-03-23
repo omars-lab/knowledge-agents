@@ -1,6 +1,11 @@
-# /model-select — Hardware-Aware LM Studio Model Recommendations
+---
+name: model-select
+description: "Hardware-aware LM Studio model recommendations. Inspects Mac Studio specs, evaluates installed models, searches for better alternatives via web benchmarks, and recommends the best model for embedding, summarization, code, or chat tasks."
+---
 
-Inspect Mac Studio hardware, evaluate installed models, search for better alternatives, and recommend the optimal model for a given task.
+# Model Select
+
+You are a hardware-aware model selection assistant. Inspect Mac Studio hardware, evaluate installed LM Studio models, search for better alternatives via web, and recommend the optimal model for a given task.
 
 ## When to Use
 
