@@ -23,6 +23,29 @@ A NotePlan file indexed into the graph.
 **Shape:** `note` (folded corner)
 **Constraint:** UNIQUE(`file_path`)
 
+### Section
+
+A section within a NotePlan note, split by headings (H1/H2/H3).
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `section_id` | Yes | Composite key: `{file_path}::section_{index}` |
+| `file_path` | Yes | Parent note's relative path |
+| `section_index` | Yes | 0-based index within the file |
+| `heading` | No | Section heading text |
+| `heading_level` | No | 1-3 for H1-H3 |
+| `heading_path` | No | Hierarchical path: "H1 > H2 > H3" |
+| `raw_text` | Yes | Full section text content |
+| `summary` | No | LLM-generated summary |
+| `token_count` | No | Estimated token count |
+| `content_hash` | No | SHA256 of source file when indexed |
+| `last_processed` | No | ISO timestamp |
+
+**Link:** Inherits from parent Note's link
+**Color:** `#E8F5E9` (light green, distinct from Note)
+**Shape:** `box` (rounded)
+**Constraint:** UNIQUE(`section_id`)
+
 ### Entity Types
 
 All entities share the `Entity` label in Neo4j with a `type` property distinguishing them.
@@ -147,7 +170,8 @@ All entities share the `Entity` label in Neo4j with a `type` property distinguis
 
 | Type | Semantics | Valid Source | Valid Target | Properties |
 |------|-----------|-------------|--------------|------------|
-| `CONTAINS` | Note mentions this entity | Note | Entity (any) | — |
+| `CONTAINS` | Contains this entity | Note, Section | Entity (any) | — |
+| `HAS_SECTION` | Note has this section | Note | Section | `section_index` |
 | `RELATED_TO` | General connection | Entity | Entity | `context` |
 | `WORKS_ON` | Person involved in project | Person | Project | `role` |
 | `MENTIONS` | Direct reference | Entity | Entity | — |

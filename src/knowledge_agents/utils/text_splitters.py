@@ -41,6 +41,7 @@ def split_content_into_sections(
             - section_index: int (0-based index)
             - heading: Optional[str] (heading text if section starts with heading)
             - heading_level: Optional[int] (heading level 1-6 if applicable)
+            - heading_path: str (hierarchical path like "H1 > H2 > H3")
     """
     from .vector_store_utils import estimate_tokens
     
@@ -63,6 +64,7 @@ def split_content_into_sections(
                 "section_index": 0,
                 "heading": None,
                 "heading_level": None,
+                "heading_path": "",
             }
         ]
         return sections
@@ -93,13 +95,15 @@ def split_content_into_sections(
             
             # Check metadata for heading information
             # LangChain stores headers in metadata like {"Header 1": "Introduction", "Header 2": "Section 1"}
-            # We want the most specific (deepest) header
-            for level in range(3, 0, -1):  # Check Header 3, then 2, then 1
+            # Build heading_path from all ancestor headers, and extract deepest heading
+            heading_path_parts = []
+            for level in range(1, 4):  # Header 1, 2, 3
                 header_key = f"Header {level}"
                 if header_key in split.metadata:
+                    heading_path_parts.append(split.metadata[header_key])
                     heading = split.metadata[header_key]
                     heading_level = level
-                    break
+            heading_path = " > ".join(heading_path_parts)
             
             # Convert to HTML if requested
             if convert_to_html:
@@ -119,6 +123,7 @@ def split_content_into_sections(
                         "section_index": section_index,
                         "heading": heading,
                         "heading_level": heading_level,
+                        "heading_path": heading_path,
                     }
                 )
             else:
@@ -126,7 +131,7 @@ def split_content_into_sections(
                 chunks = _chunk_large_section(
                     section_content, max_tokens=max_tokens, is_html=convert_to_html
                 )
-                
+
                 for chunk_idx, chunk_content in enumerate(chunks):
                     sections.append(
                         {
@@ -134,6 +139,7 @@ def split_content_into_sections(
                             "section_index": len(sections),
                             "heading": heading if chunk_idx == 0 else None,
                             "heading_level": heading_level if chunk_idx == 0 else None,
+                            "heading_path": heading_path,
                         }
                     )
         
@@ -188,20 +194,23 @@ def _split_markdown_by_headings_fallback(
         if convert_to_html:
             import markdown
             content = markdown.markdown(content, extensions=["extra", "nl2br"])
-        
+
         return [
             {
                 "content": content,
                 "section_index": 0,
                 "heading": None,
                 "heading_level": None,
+                "heading_path": "",
             }
         ]
-    
+
     # Split content by headings
     sections = []
     section_index = 0
-    
+    # Track heading ancestors for building heading_path
+    heading_stack: list[tuple[int, str]] = []  # [(level, text), ...]
+
     for i, (heading_pos, heading_level, heading_text) in enumerate(headings):
         # Determine section boundaries
         start_pos = heading_pos
@@ -212,9 +221,16 @@ def _split_markdown_by_headings_fallback(
         else:
             end_pos = len(markdown_content)
         
+        # Build heading_path by maintaining a stack of ancestor headings
+        # Pop headings at same or deeper level, then push current
+        while heading_stack and heading_stack[-1][0] >= heading_level:
+            heading_stack.pop()
+        heading_stack.append((heading_level, heading_text))
+        heading_path = " > ".join(text for _, text in heading_stack)
+
         # Extract section content (include the heading)
         section_markdown = markdown_content[start_pos:end_pos].strip()
-        
+
         # Convert to HTML if requested
         section_content = section_markdown
         if convert_to_html:
@@ -222,27 +238,26 @@ def _split_markdown_by_headings_fallback(
             section_content = markdown.markdown(
                 section_markdown, extensions=["extra", "nl2br"]
             )
-        
+
         # Check token count and chunk if necessary
         tokens = estimate_tokens(section_content)
-        
+
         if tokens <= max_tokens:
-            # Section fits within token limit
             sections.append(
                 {
                     "content": section_content,
                     "section_index": section_index,
                     "heading": heading_text,
                     "heading_level": heading_level,
+                    "heading_path": heading_path,
                 }
             )
             section_index += 1
         else:
-            # Section too large, chunk it
             chunks = _chunk_large_section(
                 section_content, max_tokens=max_tokens, is_html=convert_to_html
             )
-            
+
             for chunk_idx, chunk_content in enumerate(chunks):
                 sections.append(
                     {
@@ -250,6 +265,7 @@ def _split_markdown_by_headings_fallback(
                         "section_index": section_index,
                         "heading": heading_text if chunk_idx == 0 else None,
                         "heading_level": heading_level if chunk_idx == 0 else None,
+                        "heading_path": heading_path,
                     }
                 )
                 section_index += 1

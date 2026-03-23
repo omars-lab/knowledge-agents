@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Dict, Tuple
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 from neo4j import GraphDatabase
 
@@ -89,16 +90,25 @@ def setup_graph_schema(driver: GraphDatabase.driver, database: str = "neo4j") ->
                 # Constraint might already exist
                 logger.debug(f"Constraint may already exist: {e}")
         
+        # Section constraint
+        section_constraints = [
+            "CREATE CONSTRAINT section_id IF NOT EXISTS FOR (s:Section) REQUIRE s.section_id IS UNIQUE",
+        ]
+        for constraint in section_constraints:
+            try:
+                session.run(constraint)
+                logger.debug(f"Created constraint: {constraint.split()[2]}")
+            except Exception as e:
+                logger.debug(f"Constraint may already exist: {e}")
+
         # Create indexes for better query performance
         indexes = [
-            # Index on Note file_path (already unique via constraint, but explicit index helps)
             "CREATE INDEX note_file_path_idx IF NOT EXISTS FOR (n:Note) ON (n.file_path)",
-            # Index on Entity name (already unique via constraint, but explicit index helps)
             "CREATE INDEX entity_name_idx IF NOT EXISTS FOR (e:Entity) ON (e.name)",
-            # Index on Entity type for filtering
             "CREATE INDEX entity_type_idx IF NOT EXISTS FOR (e:Entity) ON (e.type)",
-            # Index on Note last_processed for tracking updates
             "CREATE INDEX note_last_processed_idx IF NOT EXISTS FOR (n:Note) ON (n.last_processed)",
+            "CREATE INDEX section_file_path_idx IF NOT EXISTS FOR (s:Section) ON (s.file_path)",
+            "CREATE INDEX section_heading_idx IF NOT EXISTS FOR (s:Section) ON (s.heading)",
         ]
         
         for index in indexes:
@@ -312,6 +322,97 @@ def create_graph_nodes_and_relationships(
                 relationships_created += 1
     
     return entities_created, relationships_created
+
+
+def create_section_nodes(
+    driver: "GraphDatabase.driver",
+    file_path: str,
+    sections: list[dict[str, Any]],
+    database: str = "neo4j",
+) -> int:
+    """Create Section nodes and HAS_SECTION relationships for a file.
+
+    Idempotent: deletes existing sections for this file first, then creates new ones.
+    Each section dict should have: section_id, section_index, heading, heading_level,
+    heading_path, raw_text, summary, token_count, content_hash.
+
+    Returns count of sections created.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+
+    with driver.session(database=database) as session:
+        # Delete existing sections for this file (idempotent)
+        session.run(
+            "MATCH (n:Note {file_path: $fp})-[:HAS_SECTION]->(s:Section) DETACH DELETE s",
+            fp=file_path,
+        )
+
+        created = 0
+        for sec in sections:
+            session.run(
+                """
+                MERGE (n:Note {file_path: $file_path})
+                SET n.last_processed = $now
+                CREATE (s:Section {
+                    section_id: $section_id,
+                    file_path: $file_path,
+                    section_index: $section_index,
+                    heading: $heading,
+                    heading_level: $heading_level,
+                    heading_path: $heading_path,
+                    raw_text: $raw_text,
+                    summary: $summary,
+                    token_count: $token_count,
+                    content_hash: $content_hash,
+                    last_processed: $now
+                })
+                CREATE (n)-[:HAS_SECTION {section_index: $section_index}]->(s)
+                """,
+                file_path=file_path,
+                section_id=sec["section_id"],
+                section_index=sec["section_index"],
+                heading=sec.get("heading"),
+                heading_level=sec.get("heading_level"),
+                heading_path=sec.get("heading_path", ""),
+                raw_text=sec.get("raw_text", ""),
+                summary=sec.get("summary"),
+                token_count=sec.get("token_count", 0),
+                content_hash=sec.get("content_hash"),
+                now=now,
+            )
+            created += 1
+
+    logger.info("Created %d Section nodes for %s", created, file_path)
+    return created
+
+
+def link_section_entities(
+    driver: "GraphDatabase.driver",
+    section_id: str,
+    entity_names: list[str],
+    database: str = "neo4j",
+) -> int:
+    """Create CONTAINS relationships from a Section to existing Entity nodes.
+
+    Only links to entities that already exist in the graph (from build_knowledge_graph).
+    Returns count of relationships created.
+    """
+    if not entity_names:
+        return 0
+
+    with driver.session(database=database) as session:
+        result = session.run(
+            """
+            MATCH (s:Section {section_id: $section_id})
+            MATCH (e:Entity) WHERE e.name IN $names
+            MERGE (s)-[:CONTAINS]->(e)
+            RETURN count(*) AS linked
+            """,
+            section_id=section_id,
+            names=entity_names,
+        )
+        record = result.single()
+        return record["linked"] if record else 0
 
 
 async def extract_from_note_file(
