@@ -32,6 +32,7 @@ except ImportError:
     print("Also need system graphviz: brew install graphviz")
     sys.exit(1)
 
+import requests as http_requests
 from neo4j import GraphDatabase
 
 
@@ -46,9 +47,29 @@ TYPE_COLORS = {
     "Organization": "#FF6B6B",
     "Tool": "#98D8C8",
     "Event": "#C9B1FF",
-    "Note": "#E8E8E8",
+    "Note": "#FFF3CD",
+    "Task": "#FFD6D6",
 }
 DEFAULT_COLOR = "#D3D3D3"
+
+TIDY_MCP_URL = "http://localhost:8003"
+
+
+def _get_xcallback_url(file_path: str) -> str | None:
+    """Get a noteplan:// xcallback URL for a file path via tidy-mcp."""
+    try:
+        resp = http_requests.post(
+            f"{TIDY_MCP_URL}/tools/derive_xcallback_url_from_noteplan_file",
+            json={"file_path": file_path},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("success"):
+            return data["x_callback_url"]
+    except Exception:
+        pass
+    return None
 
 
 def query_neo4j(driver, database, cypher):
@@ -76,17 +97,16 @@ def build_entity_graph(driver, database, entity_name, limit=50):
 
 
 def build_all_graph(driver, database, limit=50):
-    """Get the full entity graph."""
+    """Get the full graph including Note → Entity CONTAINS relationships."""
     cypher = f"""
-    MATCH (e:Entity)-[r]->(m)
-    RETURN e.name AS from_name, e.type AS from_type,
-           type(r) AS rel_type,
-           CASE WHEN m:Entity THEN m.name
-                WHEN m:Note THEN m.file_path
-                ELSE 'unknown' END AS to_name,
-           CASE WHEN m:Entity THEN m.type
-                WHEN m:Note THEN 'Note'
-                ELSE 'unknown' END AS to_type
+    MATCH (n)-[r]->(m)
+    WHERE (n:Entity OR n:Note) AND (m:Entity OR m:Note)
+    RETURN
+        CASE WHEN n:Note THEN n.file_path ELSE n.name END AS from_name,
+        CASE WHEN n:Note THEN 'Note' ELSE n.type END AS from_type,
+        type(r) AS rel_type,
+        CASE WHEN m:Note THEN m.file_path ELSE m.name END AS to_name,
+        CASE WHEN m:Note THEN 'Note' ELSE m.type END AS to_type
     LIMIT {limit}
     """
     return query_neo4j(driver, database, cypher)
@@ -157,11 +177,39 @@ def render_svg(records, output_path, fmt="svg", title=None):
         if r.get("to_name"):
             nodes[r["to_name"]] = r.get("to_type", "Entity")
 
+    # Resolve xcallback URLs for Note nodes
+    note_urls: dict[str, str] = {}
+    note_nodes = [n for n, t in nodes.items() if t == "Note"]
+    for file_path in note_nodes:
+        url = _get_xcallback_url(file_path)
+        if url:
+            note_urls[file_path] = url
+
     # Add nodes
     for name, node_type in nodes.items():
         color = TYPE_COLORS.get(node_type, DEFAULT_COLOR)
-        label = f"{name}\n({node_type})" if node_type and node_type != "Entity" else name
-        dot.node(name, label=label, fillcolor=color)
+
+        if node_type == "Note":
+            # Note nodes: distinct shape, short label, clickable noteplan:// link
+            short_name = Path(name).stem  # "20251218" or "Ideas"
+            label = f"📄 {short_name}"
+            attrs = {
+                "label": label,
+                "fillcolor": color,
+                "shape": "note",
+                "style": "filled",
+                "fontsize": "11",
+                "penwidth": "2",
+                "color": "#B8860B",
+                "tooltip": name,
+            }
+            if name in note_urls:
+                attrs["URL"] = note_urls[name]
+                attrs["target"] = "_blank"
+            dot.node(name, **attrs)
+        else:
+            label = f"{name}\n({node_type})" if node_type and node_type != "Entity" else name
+            dot.node(name, label=label, fillcolor=color)
 
     # Add edges
     for r in records:
