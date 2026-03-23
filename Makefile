@@ -612,6 +612,20 @@ claude-agent-graph: ## Render knowledge graph as SVG (usage: make claude-agent-g
 	@echo "📊 Opening graph..."
 	@open build/graphs/latest.svg 2>/dev/null || echo "  Open: build/graphs/latest.svg"
 
+NOTEPLAN_DIR ?= /Users/omareid/Library/Containers/co.noteplan.NotePlan3/Data/Library/Application Support/co.noteplan.NotePlan3
+
+seed-sections: ## Index NotePlan sections into Qdrant + Neo4j (delta — only changed files)
+	@conda run -n $(conda-env-name) python scripts/seed_sections.py \
+		--noteplan-dir "$(NOTEPLAN_DIR)" --delay 0.5
+
+seed-sections-full: ## Full re-index all NotePlan sections
+	@conda run -n $(conda-env-name) python scripts/seed_sections.py \
+		--noteplan-dir "$(NOTEPLAN_DIR)" --full-reindex --delay 0.5
+
+seed-sections-summarize: ## Index sections with LLM summarization
+	@conda run -n $(conda-env-name) python scripts/seed_sections.py \
+		--noteplan-dir "$(NOTEPLAN_DIR)" --summarize --concurrency 3 --delay 1
+
 claude-agent-chat: ## Quick test of Claude Agent chat (usage: make claude-agent-chat MSG="your question")
 	@if [ -z "$(MSG)" ]; then echo "❌ Please provide MSG=\"your question\""; exit 1; fi
 	@echo "💬 Sending message to Claude Agent: $(MSG)"
@@ -619,3 +633,31 @@ claude-agent-chat: ## Quick test of Claude Agent chat (usage: make claude-agent-
 		-H "Content-Type: application/json" \
 		-d "{\"message\": \"$(MSG)\"}" \
 		| ( command -v jq >/dev/null 2>&1 && jq . || cat )
+
+# =============================================================================
+# OBSERVABILITY TARGETS
+# =============================================================================
+
+observability-install: ## Install Loki Docker logging driver plugin (one-time)
+	@echo "🔌 Installing Loki Docker logging driver..."
+	@docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions 2>/dev/null \
+		&& echo "✅ Installed locally" || echo "ℹ️  Already installed locally (or error)"
+	@echo "🔍 Verifying:"
+	@docker plugin ls | grep loki || echo "❌ Plugin not found"
+
+observability-up: ## Start Grafana + Loki observability stack
+	@echo "📊 Starting observability stack..."
+	docker compose up -d loki grafana
+	@echo "⏳ Waiting for Loki..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		curl -sf http://localhost:3100/ready >/dev/null 2>&1 && echo "✅ Loki ready" && break || sleep 2; \
+	done
+	@echo "✅ Grafana: http://localhost:3001 (admin/knowledge123)"
+
+observability-down: ## Stop observability stack
+	@echo "🛑 Stopping observability stack..."
+	docker compose stop grafana loki
+	@echo "✅ Stopped"
+
+grafana-open: ## Open Grafana dashboard in browser
+	@open http://localhost:3001 2>/dev/null || echo "Open: http://localhost:3001"

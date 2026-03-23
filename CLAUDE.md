@@ -198,6 +198,8 @@ See [docs/USE_CASES.md](docs/USE_CASES.md) for the complete use-case catalog map
 These documents must be kept up to date as features are added or changed:
 - **`docs/USE_CASES.md`** -- When adding a new feature or agent capability, add a use case entry with links to the implementing code, tests, and evals
 - **`docs/GRAPH_SCHEMA.md`** -- When adding node types, relationship types, link resolution rules, or entity properties
+- **`docs/OBSERVABILITY.md`** -- When adding metrics, changing log format, or modifying the observability stack
+- **`docs/TECH_DESIGN.md`** -- When making architecture decisions, changing models, or modifying infrastructure
 - **`CLAUDE.md`** -- When adding new commands, conventions, or architectural patterns
 - **`DEVELOPMENT.md`** -- When changing build/test workflows or architecture
 - **`README.md`** -- When changing setup instructions or project overview

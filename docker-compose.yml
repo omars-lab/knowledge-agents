@@ -325,6 +325,36 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"  # Allow access to host Neo4j Desktop
 
+  # ---------------------------------------------------------------------------
+  # Observability (Loki + Grafana)
+  # ---------------------------------------------------------------------------
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+      - ./config/loki.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    # No healthcheck — Loki image has no wget/curl. Grafana tolerates Loki being slow to start.
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=knowledge123
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   prometheus_data:
@@ -332,6 +362,8 @@ volumes:
   neo4j_data:
   neo4j_logs:
   claude_agent_config:
+  loki_data:
+  grafana_data:
 
 secrets:
   openai_api_key:

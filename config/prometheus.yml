@@ -26,3 +26,11 @@ scrape_configs:
     scrape_interval: 10s
     metrics_path: '/metrics'
     scrape_timeout: 5s
+
+  # Claude Agent - separate metrics namespace (claude_agent_*)
+  - job_name: 'claude-agent'
+    static_configs:
+      - targets: ['claude-agent:8000']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+    scrape_timeout: 5s

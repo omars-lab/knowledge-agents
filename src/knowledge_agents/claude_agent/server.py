@@ -23,7 +23,8 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from pydantic import BaseModel
 
 from .agent import run_agent_buffered, stream_agent_response
@@ -31,6 +32,40 @@ from .config import ClaudeAgentSettings
 from .tools import close_tool_clients, init_tool_clients
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Prometheus metrics (claude_agent_ namespace, separate from agentic-api)
+# ---------------------------------------------------------------------------
+
+CHAT_REQUESTS = Counter(
+    "claude_agent_chat_requests_total",
+    "Total chat requests",
+    ["status"],  # success, error, transport_error
+)
+CHAT_DURATION = Histogram(
+    "claude_agent_chat_duration_seconds",
+    "Chat response time in seconds",
+    buckets=[1, 5, 10, 30, 60, 120, 300, 600],
+)
+TOOL_CALLS = Counter(
+    "claude_agent_tool_calls_total",
+    "Tool invocations by name",
+    ["tool_name"],
+)
+RATE_LIMIT_EVENTS = Counter(
+    "claude_agent_rate_limit_events_total",
+    "Rate limit events by status",
+    ["status"],  # allowed, allowed_warning, rejected
+)
+COST_TOTAL = Counter(
+    "claude_agent_cost_usd_total",
+    "Cumulative API cost in USD",
+)
+STREAM_REQUESTS = Counter(
+    "claude_agent_stream_requests_total",
+    "Total streaming chat requests",
+    ["status"],
+)
 
 settings = ClaudeAgentSettings()
 
@@ -47,17 +82,32 @@ def _setup_logging() -> None:
                 record.request_id = "-"
             return super().format(record)
 
-    fmt = _RequestIdFormatter(
+    class _JsonFormatter(logging.Formatter):
+        """JSON formatter for file handlers — structured for Loki ingestion."""
+
+        def format(self, record):
+            return json.dumps({
+                "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage(),
+                "service": "claude-agent",
+                "request_id": getattr(record, "request_id", None),
+                "lineno": record.lineno,
+            })
+
+    console_fmt = _RequestIdFormatter(
         "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d [%(request_id)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    json_fmt = _JsonFormatter()
 
-    # Console handler
+    # Console handler (plain text for humans)
     console = logging.StreamHandler()
-    console.setFormatter(fmt)
+    console.setFormatter(console_fmt)
     console.setLevel(log_level)
 
-    # File handler (rotating)
+    # File handler (JSON for Loki/machine consumption)
     handlers = [console]
     logs_dir = Path("build/logs")
     if logs_dir.exists():
@@ -66,7 +116,7 @@ def _setup_logging() -> None:
             maxBytes=10 * 1024 * 1024,  # 10MB
             backupCount=5,
         )
-        file_handler.setFormatter(fmt)
+        file_handler.setFormatter(json_fmt)
         file_handler.setLevel(log_level)
         handlers.append(file_handler)
 
@@ -192,6 +242,12 @@ async def health():
     return {"status": "healthy", "service": "claude-agent"}
 
 
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 @app.post("/api/v1/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Send a message and get a full buffered response."""
@@ -220,6 +276,15 @@ async def chat(request: ChatRequest):
             len(response_text),
         )
 
+        # Record Prometheus metrics
+        CHAT_REQUESTS.labels(status="success").inc()
+        CHAT_DURATION.observe((time.monotonic() - start))
+        cost = metadata.get("cost_usd") or 0
+        if cost:
+            COST_TOTAL.inc(cost)
+        for tool in metadata.get("tools_used", []):
+            TOOL_CALLS.labels(tool_name=tool).inc()
+
         return ChatResponse(
             session_id=metadata.get("session_id", ""),
             response=response_text,
@@ -229,8 +294,14 @@ async def chat(request: ChatRequest):
     except Exception as exc:
         elapsed_ms = int((time.monotonic() - start) * 1000)
         log.exception("chat FAILED after %dms — session=%s", elapsed_ms, request.session_id)
-        # Surface CLIConnectionError as a 503 with actionable details
+        # Record error metric
         exc_name = type(exc).__name__
+        if "CLIConnectionError" in exc_name or "ProcessTransport" in str(exc):
+            CHAT_REQUESTS.labels(status="transport_error").inc()
+        else:
+            CHAT_REQUESTS.labels(status="error").inc()
+        CHAT_DURATION.observe((time.monotonic() - start))
+        # Surface CLIConnectionError as a 503 with actionable details
         if "CLIConnectionError" in exc_name or "ProcessTransport" in str(exc):
             raise HTTPException(
                 status_code=503,
