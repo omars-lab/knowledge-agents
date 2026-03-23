@@ -61,34 +61,40 @@ For the user's stated task, determine:
 | **General chat** | Response quality, reasoning | General instruct | 8-70 GB |
 | **Entity extraction** | Structured output, accuracy | Instruct model | 5-15 GB |
 
-### Step 5: Search for Better Models
+### Step 5: Search LM Studio Catalog FIRST (installable models only)
 
-Use web search to find the latest benchmarks and recommendations. Key searches:
+**IMPORTANT:** Only recommend models that are actually installable via LM Studio. Search the catalog first, then use web search to rank the available options.
 
-**For embeddings:**
-- Search: `"best embedding model 2025 2026 GGUF local" MTEB benchmark`
-- Check: [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) for retrieval benchmarks
-- Consider: Jina v5, Qwen3 Embedding, Nomic Embed, BGE
-
-**For summarization/chat:**
-- Search: `"best local LLM summarization 2026 GGUF Apple Silicon" benchmark`
-- Check: [Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard)
-- Consider: Qwen3 (latest gen), Llama 4, Mistral, Phi
-
-**For code:**
-- Search: `"best local code model 2026 GGUF" HumanEval benchmark`
-- Consider: Qwen3-Coder, DeepSeek Coder, Devstral
-
-### Step 6: Search LM Studio Catalog
-
-For each recommended model, check if it's available in LM Studio:
+Search the LM Studio catalog for candidate models by task type:
 
 ```bash
-# Interactive search (will show available models)
-ssh -o ConnectTimeout=5 mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' get '<model-name>' --quiet 2>&1" | head -20
+# Search by task-relevant keywords — check what's ACTUALLY available
+ssh -o ConnectTimeout=5 mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' get '<search-term>' --quiet 2>&1" | head -20
 ```
 
-Note: `lms get` is interactive — it shows a selection list. Look at the output to see if the model exists.
+**Search terms by task type:**
+- **Embedding:** `embedding`, `qwen3-embedding`, `jina-embedding`, `nomic-embed`
+- **Summarization/chat:** `qwen3.5`, `qwen3`, `llama`, `mistral`, `phi`
+- **Code:** `coder`, `devstral`, `deepseek-coder`
+
+Run multiple searches to build a candidate list. Only models that appear in these results can be recommended.
+
+### Step 6: Research Candidates via Web (rank available models)
+
+Now that you have a list of **installable** models, use web search to rank them by quality:
+
+**For embeddings:**
+- Search: `"<model-name> MTEB retrieval benchmark score"` for each candidate
+- Check: [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard)
+
+**For summarization/chat:**
+- Search: `"<model-name> benchmark MMLU quality 2026"` for each candidate
+- Check: [Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard)
+
+**For code:**
+- Search: `"<model-name> HumanEval pass@1 benchmark"` for each candidate
+
+Only include benchmark data for models confirmed available in LM Studio catalog.
 
 ### Step 7: Evaluate Fit
 
