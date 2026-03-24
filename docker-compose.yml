@@ -356,33 +356,131 @@ services:
       - loki
     restart: unless-stopped
 
-  # Langfuse — LLM observability (tracing, evals, prompt management)
-  langfuse:
-    image: langfuse/langfuse:latest
-    ports:
-      - "3210:3000"
+  # Langfuse v3 — LLM observability (tracing, evals, prompt management)
+  # Requires: ClickHouse (OLAP), Redis (queue/cache), Minio (S3-compatible blob store)
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:24.3
     environment:
-      - DATABASE_URL=postgresql://knowledge:knowledge123@postgres:5432/langfuse
-      - NEXTAUTH_SECRET=langfuse-secret-knowledge-agents
-      - NEXTAUTH_URL=http://localhost:3210
-      - SALT=langfuse-salt-knowledge-agents
-      - LANGFUSE_INIT_ORG_ID=knowledge-agents
-      - LANGFUSE_INIT_ORG_NAME=Knowledge Agents
-      - LANGFUSE_INIT_PROJECT_ID=knowledge-agents
-      - LANGFUSE_INIT_PROJECT_NAME=Knowledge Agents
-      - LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-knowledge
-      - LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-knowledge
-      - LANGFUSE_INIT_USER_EMAIL=admin@local
-      - LANGFUSE_INIT_USER_PASSWORD=knowledge123
+      - CLICKHOUSE_DB=langfuse
+      - CLICKHOUSE_USER=clickhouse
+      - CLICKHOUSE_PASSWORD=clickhouse123
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  langfuse-redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass langfuse123
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "langfuse123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  langfuse-minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minio
+      - MINIO_ROOT_PASSWORD=minio123456
+    volumes:
+      - langfuse_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  langfuse-create-bucket:
+    image: minio/mc:latest
+    depends_on:
+      langfuse-minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://langfuse-minio:9000 minio minio123456;
+      mc mb myminio/langfuse --ignore-existing;
+      exit 0;
+      "
+    restart: "no"
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
     depends_on:
       postgres:
         condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+    environment: &langfuse-env
+      DATABASE_URL: postgresql://knowledge:knowledge123@postgres:5432/langfuse
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:clickhouse123@langfuse-clickhouse:9000/langfuse
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse123
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: langfuse123
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: minio123456
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: minio123456
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      SALT: langfuse-salt-knowledge-agents
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      TELEMETRY_ENABLED: "false"
+    restart: unless-stopped
+
+  langfuse:
+    image: langfuse/langfuse:3
+    ports:
+      - "3210:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: langfuse-secret-knowledge-agents
+      NEXTAUTH_URL: http://localhost:3210
+      LANGFUSE_INIT_ORG_ID: knowledge-agents
+      LANGFUSE_INIT_ORG_NAME: Knowledge Agents
+      LANGFUSE_INIT_PROJECT_ID: knowledge-agents
+      LANGFUSE_INIT_PROJECT_NAME: Knowledge Agents
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-knowledge
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-knowledge
+      LANGFUSE_INIT_USER_EMAIL: admin@localhost.dev
+      LANGFUSE_INIT_USER_PASSWORD: knowledge123
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/public/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 90s
     restart: unless-stopped
 
 volumes:
@@ -394,6 +492,8 @@ volumes:
   claude_agent_config:
   loki_data:
   grafana_data:
+  langfuse_clickhouse_data:
+  langfuse_minio_data:
 
 secrets:
   openai_api_key:
