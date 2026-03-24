@@ -222,13 +222,15 @@ async def phase_store(
 
         # ── Graphiti: ingest sections as episodes (automatic entity extraction) ──
         if graphiti:
+            from knowledge_agents.claude_agent.graphiti_client import derive_reference_time
             for s in file_sections:
                 try:
+                    ref_time = derive_reference_time(s.file_path, Path(noteplan_dir) if 'noteplan_dir' in dir() else None)
                     await graphiti.add_episode(
                         name=s.heading or f"Section {s.section_index}",
                         episode_body=s.raw_text,
                         source_description=f"NotePlan {s.file_path} :: {s.heading_path}" if s.heading_path else f"NotePlan {s.file_path}",
-                        reference_time=datetime.now(timezone.utc),
+                        reference_time=ref_time,
                         group_id="noteplan",
                     )
                     stats.entities_linked += 1  # approximate — Graphiti extracts automatically

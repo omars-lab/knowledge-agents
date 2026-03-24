@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,36 @@ GRAPHITI_GROUP = "noteplan"
 
 _graphiti_instance = None
 _initialized = False
+
+
+def derive_reference_time(file_path: str, noteplan_dir: Path | None = None) -> datetime:
+    """Derive the best reference time for a note.
+
+    Priority:
+    1. Calendar notes (Calendar/YYYYMMDD.md): parse date from filename
+    2. Regular notes: use file modification time from filesystem
+    3. Fallback: datetime.now(utc)
+    """
+    # Calendar note: parse YYYYMMDD from filename
+    match = re.match(r"Calendar/(\d{4})(\d{2})(\d{2})\.md$", file_path)
+    if match:
+        try:
+            return datetime(
+                int(match.group(1)), int(match.group(2)), int(match.group(3)),
+                tzinfo=timezone.utc,
+            )
+        except ValueError:
+            pass  # Invalid date, fall through
+
+    # Regular note: use file modification time
+    if noteplan_dir:
+        full_path = noteplan_dir / file_path
+        if full_path.exists():
+            mtime = full_path.stat().st_mtime
+            return datetime.fromtimestamp(mtime, tz=timezone.utc)
+
+    # Fallback
+    return datetime.now(timezone.utc)
 
 
 def _extract_json(text: str) -> str:

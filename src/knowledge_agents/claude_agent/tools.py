@@ -21,7 +21,7 @@ from neo4j import GraphDatabase
 from openai import OpenAI
 from qdrant_client import QdrantClient
 
-from .graphiti_client import get_graphiti, GRAPHITI_GROUP
+from .graphiti_client import get_graphiti, GRAPHITI_GROUP, derive_reference_time
 from ..utils.graph_utils import setup_graph_schema  # Still needed for Neo4j index setup
 
 from .config import ClaudeAgentSettings
@@ -293,11 +293,16 @@ async def build_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
                 "is_error": True,
             }
 
+        ref_time = derive_reference_time(
+            file_path,
+            noteplan_dir=Path(_settings.noteplan_dir) if _settings else None,
+        )
+
         await graphiti.add_episode(
             name=file_path,
             episode_body=note_content,
             source_description=f"NotePlan {file_path}",
-            reference_time=datetime.now(timezone.utc),
+            reference_time=ref_time,
             group_id=GRAPHITI_GROUP,
         )
 
