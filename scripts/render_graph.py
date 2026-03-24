@@ -174,6 +174,10 @@ def render_svg(records, output_path, fmt="svg", title=None):
             nodes[r["to_name"]] = {"type": r.get("to_type", "Entity"), "props": props}
 
     # Add nodes with schema-driven colors, shapes, and links
+    def _safe(s: str) -> str:
+        """Sanitize string for graphviz — remove backslashes and control chars."""
+        return s.replace("\\", "").replace('"', "'").replace("\n", " ").replace("\r", "")
+
     for name, info in nodes.items():
         node_type = info["type"]
         props = info["props"]
@@ -195,7 +199,8 @@ def render_svg(records, output_path, fmt="svg", title=None):
                 "tooltip": name,
             }
         else:
-            label = f"{name}\n({node_type})" if node_type and node_type != "Entity" else name
+            safe_name = _safe(name)
+            label = f"{safe_name}\n({node_type})" if node_type and node_type != "Entity" else safe_name
             attrs = {
                 "label": label,
                 "fillcolor": color,
@@ -207,12 +212,12 @@ def render_svg(records, output_path, fmt="svg", title=None):
             attrs["URL"] = url
             attrs["target"] = "_blank"
 
-        dot.node(name, **attrs)
+        dot.node(_safe(name), **attrs)
 
     # Add edges
     for r in records:
         if r.get("from_name") and r.get("to_name") and r.get("rel_type"):
-            dot.edge(r["from_name"], r["to_name"], label=r["rel_type"])
+            dot.edge(_safe(r["from_name"]), _safe(r["to_name"]), label=r["rel_type"])
 
     # Render
     output = Path(output_path)

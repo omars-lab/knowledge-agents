@@ -31,3 +31,6 @@ prometheus_client>=0.20.0
 
 # LLM Observability (Langfuse tracing)
 langfuse>=2.0.0
+
+# Temporal Knowledge Graph (Graphiti)
+graphiti-memory>=0.2.0
