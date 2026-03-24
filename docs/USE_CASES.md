@@ -55,3 +55,27 @@ A living catalog mapping each feature to its implementing code, tests, and evals
 **How**: Claude agent chains `semantic_search` -> `read_note` -> `build_knowledge_graph` -> `query_knowledge_graph`
 **Code**: Orchestrated by Claude agent via tools in `src/knowledge_agents/claude_agent/tools.py`
 **Reuses**: `graph_utils.create_graph_nodes_and_relationships()`, `notes.parser.read_noteplan_file()`
+
+## UC-6: Section-Level Note Indexing (NEW)
+
+**What**: Parse NotePlan files into heading-level sections, optionally summarize via local LLM, embed, and store in Qdrant + Neo4j
+**Pipeline**: `scripts/seed_sections.py` — 4-phase (parse → summarize → embed → store)
+**Code**:
+- Types: `src/knowledge_agents/types/section.py`
+- Splitting: `src/knowledge_agents/utils/text_splitters.py` (heading paths)
+- Summarizer: `src/knowledge_agents/services/summarizer.py`
+- Delta tracking: `src/knowledge_agents/utils/delta_tracker.py`
+- Graph storage: `src/knowledge_agents/utils/graph_utils.py` (Section nodes)
+**Models**: Qwen3.5-35B-A3B (summarization), Qwen3-Embedding-8B (embeddings)
+**Docs**: `docs/SECTION_INDEXING_PIPELINE.md`
+
+## UC-7: LLM Observability via Langfuse (NEW)
+
+**What**: Trace every LLM call with input/output/cost/tools, visualize multi-turn agent sessions, track quality over time
+**URL**: http://localhost:3210 (admin@localhost.dev / knowledge123)
+**Code**:
+- Tracing utility: `src/knowledge_agents/utils/langfuse_trace.py`
+- Agent instrumentation: `src/knowledge_agents/claude_agent/agent.py`
+- Summarizer instrumentation: `src/knowledge_agents/services/summarizer.py`
+**Stack**: Langfuse v3 + ClickHouse + Redis + MinIO (shares existing Postgres)
+**Docs**: `docs/OBSERVABILITY.md`

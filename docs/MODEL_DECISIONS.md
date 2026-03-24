@@ -84,4 +84,10 @@ When changing a model, update these locations:
 
 **Mac Studio:** Apple M3 Ultra, 96 GB unified memory, 687 GB disk
 **Max comfortable model load:** ~72 GB (75% of RAM)
-**LM Studio:** v0.3.39+2, GGUF format, bundled CLI at `/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms`
+**LM Studio:** v0.4.7+4 (updated from 0.3.39 to support Qwen3.5 MoE), GGUF format, bundled CLI
+
+### Operational Notes
+
+- **Thinking mode:** Qwen3.5 models use internal reasoning by default (~900 tokens overhead). Disable via `extra_body={"chat_template_kwargs": {"enable_thinking": false}}` and set `max_tokens=2000+`. Summarizer calls LM Studio directly (bypass LiteLLM) because LiteLLM strips `chat_template_kwargs`.
+- **LM Studio CLI:** Use Staff Pick names for download: `lms get 'Qwen3.5-35B-A3B@q4_k_m' --yes`. Repo-style paths fail.
+- **Version requirement:** LM Studio 0.4.7+ required for `qwen35moe` architecture.

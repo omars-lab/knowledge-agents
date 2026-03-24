@@ -131,8 +131,14 @@ Key additions for section indexing:
 
 ## Observability
 
-See [docs/OBSERVABILITY.md](OBSERVABILITY.md) for metrics, logging, and Grafana setup (living doc).
+See [docs/OBSERVABILITY.md](OBSERVABILITY.md) for the full stack reference (living doc).
 
-- Claude Agent exposes `/metrics` with `claude_agent_*` Prometheus namespace
-- JSON structured logging to `build/logs/claude_agent.log`
-- Grafana + Loki for centralized log search
+**Two observability paths:**
+- **LLM Tracing:** Langfuse v3 (self-hosted) at `localhost:3210` — captures every agent chat with input/output/cost/tools/duration. Backed by ClickHouse + Redis + MinIO.
+- **Logs:** Loki + Grafana at `localhost:3001` — container log aggregation via Docker logging driver.
+
+**Langfuse integration:**
+- Python SDK v4 with graceful degradation (no-op if Langfuse is down)
+- Traces from: Claude Agent chat, summarizer batch, tool calls
+- Pre-seeded API keys: `pk-lf-knowledge` / `sk-lf-knowledge`
+- Gotcha: v4 `end()` doesn't accept output — call `update(output=...)` then `end()`

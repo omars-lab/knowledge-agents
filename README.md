@@ -77,6 +77,18 @@ make claude-agent-graph ENTITY="machine learning" # Entity connections
 
 See [Claude Agent Architecture](docs/CLAUDE_AGENT_ARCHITECTURE.md) for full details.
 
+### Observability
+
+| Tool | Port | Purpose |
+|------|------|---------|
+| [Langfuse](http://localhost:3210) | 3210 | LLM tracing — input/output/cost per call |
+| [Grafana](http://localhost:3001) | 3001 | Infrastructure logs (Loki) |
+
+```bash
+make langfuse-up    # Start Langfuse (traces agent chats automatically)
+make langfuse-open  # Open UI (admin@localhost.dev / knowledge123)
+```
+
 ## Setup Instructions
 
 **Before running anything, you MUST provide your LiteLLM proxy API key:**

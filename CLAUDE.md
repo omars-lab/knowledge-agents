@@ -80,6 +80,11 @@ make claude-agent-auth-status       # Check auth + token expiry
 make lm-studio-status       # Check server, loaded models, API
 make lm-studio-load-embeddings  # Load embedding model
 make lm-studio-test-embedding   # Test embedding pipeline
+
+# Langfuse (LLM tracing at http://localhost:3210)
+make langfuse-up            # Start Langfuse + ClickHouse + Redis + MinIO
+make langfuse-down          # Stop all Langfuse services
+make langfuse-open          # Open Langfuse UI
 ```
 
 ### Claude Code Skills
@@ -148,6 +153,10 @@ When discovering non-obvious gotchas, limitations, or workarounds during impleme
 13. **`lms get` requires Staff Pick names, not repo paths.** Use `lms get 'Qwen3.5-35B-A3B@q4_k_m' --yes` (Staff Pick name + quantization). Do NOT use `lms get 'lmstudio-community/Qwen3.5-35B-A3B-GGUF'` — repo-style paths fail with "artifact does not exist". The `@quantization` suffix selects the variant (q4_k_m, q5_k_m, q8_0).
 
 14. **LM Studio version must match model architecture.** Newer model architectures (e.g., `qwen35moe` for Qwen3.5 MoE) require updated LM Studio versions. Error: `unknown model architecture: 'qwen35moe'`. Check version with `defaults read /Applications/LM\ Studio.app/Contents/Info.plist CFBundleShortVersionString`. Update LM Studio before downloading cutting-edge models.
+
+15. **Langfuse v4 SDK `end()` doesn't accept output.** Must call `update(output=..., metadata=...)` first, then `end()`. Also, `start_observation()` uses `as_type=` not `type=`. Context managers (`start_as_current_observation`) don't work in async generators because `yield` can't be inside a `with` block — use `start_observation()` + `update()` + `end()` instead.
+
+16. **Langfuse v3 requires ClickHouse + Redis + MinIO.** Can't use Postgres-only like v2. `CLICKHOUSE_CLUSTER_ENABLED=false` for single-node (no ZooKeeper). `LANGFUSE_INIT_USER_EMAIL` must be valid email format (not `admin@local`).
 
 ## Testing Rules
 
