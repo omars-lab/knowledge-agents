@@ -1,242 +1,185 @@
-# Model Configuration Evals: Find Ideal Summarization Settings
+# Graphiti Evaluation: Temporal Knowledge Graph for NotePlan Notes
 
 ## Context
 
-We have Qwen3.5-35B-A3B loaded on the Mac Studio for summarization, but we don't know the ideal configuration. The model has thinking mode overhead (~900 tokens), and we haven't tested different temperatures, quantizations, or whether Qwen3.5-9B (also downloaded) might be better. We need a systematic A/B framework to compare configs.
+Our current graph pipeline uses hand-built Neo4j operations: manual entity extraction via Claude Agent, MERGE-by-name deduplication, simple CONTAINS relationships, and substring-based entity linking. This works but lacks temporal tracking, entity resolution, conflict detection, and hybrid search.
 
-**What we want to find:**
-- Thinking ON vs OFF: does thinking improve summary quality enough to justify 5x token cost?
-- Temperature 0.3 vs 0.5 vs 0.7: which produces the best summaries for personal notes?
-- Qwen3.5-35B-A3B vs Qwen3.5-9B: is the bigger model worth the extra RAM/speed cost?
-- What `max_tokens` is actually needed per config?
+[Graphiti](https://github.com/getzep/graphiti) (by Zep) is an open-source temporal knowledge graph engine built on Neo4j that provides automatic entity extraction, temporal fact validity, entity resolution, hybrid search (semantic + keyword + graph traversal), and community detection — all designed for AI agent memory.
 
-**What exists:**
-- `evals/model_config/` directory (created, empty except `__init__.py`)
-- 857 Section nodes in Neo4j with `raw_text` and `token_count` (real note content)
-- Langfuse tracing for per-call cost/latency/token tracking
-- Existing eval pattern (`evals/claude_agent/runner.py` + `scorer.py`) to reuse
-- Summarizer at `src/knowledge_agents/services/summarizer.py` (needs temperature/thinking params exposed)
+**Goal:** Run a spike to evaluate whether Graphiti can replace or augment our graph building pipeline, testing with real NotePlan notes against our existing Neo4j.
+
+## Key Research Findings
+
+| Dimension | Our Pipeline | Graphiti |
+|-----------|-------------|----------|
+| Entity extraction | Claude Agent (manual prompting) | LLM-powered with structured output |
+| Temporal tracking | `last_processed` only | First-class validity windows on every fact |
+| Entity resolution | MERGE by name (no dedup) | Automatic name variant resolution |
+| Conflict handling | Overwrites silently | Fact invalidation with timestamps |
+| Search | Cypher queries only | Hybrid: semantic + keyword + graph traversal |
+| Incremental updates | Delta indexing (content hashes) | Episode-based incremental processing |
+| Provenance | Note → Entity CONTAINS | Full chain (fact → episode → source) |
+| Local LLM | LM Studio (works) | **Yes** — `OpenAIGenericClient(base_url="http://mac-studio.local:1234/v1")` |
+| Custom entity types | Entity.type property | Pydantic models per type (Person, Project, etc.) |
+| Embeddings | Qdrant (4096 dims, Qwen3) | Pluggable `EmbedderClient` — can wrap our Qdrant |
+| NotePlan sections → ? | SectionData nodes | **Episodes** (perfect conceptual match) |
+
+**Sources:**
+- [Graphiti GitHub](https://github.com/getzep/graphiti)
+- [Graphiti + Neo4j Blog](https://neo4j.com/blog/developer/graphiti-knowledge-graph-memory/)
+- [Graphiti PyPI (v0.28.2)](https://pypi.org/project/graphiti-memory/)
+- [Graphiti Overview (Zep Docs)](https://help.getzep.com/graphiti/getting-started/overview)
+- [Building AI Knowledge Graph with Graphiti](https://blog.futuresmart.ai/building-ai-knowledge-graph-using-graphiti-and-neo4j)
+- [Graphiti LLM Config (Zep Docs)](https://help.getzep.com/graphiti/configuration/llm-configuration)
+- [OpenAIGenericClient source](https://github.com/getzep/graphiti/blob/main/graphiti_core/llm_client/openai_generic_client.py)
+
+## Risks
+
+1. **Structured output requirement** — Graphiti needs LLMs that produce valid JSON per schema. Qwen3.5-9B may not reliably do this. If extraction fails, the graph is incomplete.
+2. **Neo4j schema conflict** — Graphiti creates its own node types (Entity, Episodic, Community, Saga) and relationships (RELATES_TO, MENTIONS, HAS_MEMBER). Must use a **separate Neo4j database** to avoid conflicting with our existing schema.
+3. **Embedding model mismatch** — Graphiti defaults to OpenAI embeddings. We'd need a custom `EmbedderClient` wrapping our Qwen3-Embedding-8B.
+4. **NotePlan-specific features lost** — xcallback URLs, heading paths, file type awareness aren't Graphiti concepts. We'd need to preserve these as episode metadata or entity properties.
 
 ## Plan
 
-### Step 1: Refactor summarizer to accept configurable params
+### Step 1: Install Graphiti and set up isolated Neo4j database
 
-**File:** `src/knowledge_agents/services/summarizer.py`
+Install `graphiti-memory` package. Create a `graphiti` database in our existing Neo4j instance (separate from the `neo4j` database we use now) to avoid schema conflicts.
 
-Add `temperature` and `enable_thinking` parameters to `summarize_section()`:
-```python
-async def summarize_section(
-    section, client, model=DEFAULT_MODEL,
-    max_summary_tokens=DEFAULT_MAX_SUMMARY_TOKENS,
-    temperature=0.5,
-    enable_thinking=False,
-) -> str:
-```
-
-Pass them to the OpenAI call:
-```python
-response = await client.chat.completions.create(
-    model=model,
-    max_tokens=max_summary_tokens,
-    temperature=temperature,
-    extra_body={"chat_template_kwargs": {"enable_thinking": enable_thinking}},
-    ...
-)
-```
-
-### Step 2: Create test dataset from real sections
-
-**File:** `evals/model_config/datasets/summarization.json`
-
-Pull 15-20 diverse sections from Neo4j (varying token counts, heading types, content types). Include synthetic "gold" reference summaries generated by Claude as a quality baseline.
-
-Structure:
-```json
-{
-  "test_cases": [
-    {
-      "id": "sum-001",
-      "section": {
-        "heading": "Moving Faster",
-        "heading_path": "Moving Faster",
-        "raw_text": "* Tokens / Claude Access\n* API Key?...",
-        "token_count": 250
-      },
-      "gold_summary": "Discussion of resources needed to accelerate AI development...",
-      "grading": {
-        "completeness": "Does the summary capture the main topics?",
-        "conciseness": "Is it 1-2 sentences without unnecessary detail?",
-        "faithfulness": "Does it only state things present in the source?"
-      }
-    }
-  ]
-}
-```
-
-### Step 3: Create config matrix
-
-**File:** `evals/model_config/configs.py`
-
-Define the configurations to sweep:
-```python
-CONFIGS = [
-    # Baseline (current production config)
-    {"name": "35b-a3b-t0.5-nothink", "model": "qwen3.5-35b-a3b", "temperature": 0.5, "enable_thinking": False, "max_tokens": 2000},
-    # Temperature sweep
-    {"name": "35b-a3b-t0.3-nothink", "model": "qwen3.5-35b-a3b", "temperature": 0.3, "enable_thinking": False, "max_tokens": 2000},
-    {"name": "35b-a3b-t0.7-nothink", "model": "qwen3.5-35b-a3b", "temperature": 0.7, "enable_thinking": False, "max_tokens": 2000},
-    # Thinking mode comparison
-    {"name": "35b-a3b-t0.5-think", "model": "qwen3.5-35b-a3b", "temperature": 0.5, "enable_thinking": True, "max_tokens": 4000},
-    # Model comparison (requires loading 9B)
-    {"name": "9b-t0.5-nothink", "model": "qwen3.5-9b", "temperature": 0.5, "enable_thinking": False, "max_tokens": 2000},
-]
-```
-
-### Step 4: Create eval runner
-
-**File:** `evals/model_config/runner.py`
-
-Follows the `evals/claude_agent/runner.py` pattern but calls the summarizer directly instead of the chat API:
-
-```python
-async def run_config_eval(dataset, config, langfuse_trace=True):
-    """Run all test cases with a specific model config."""
-    client = AsyncOpenAI(base_url=LM_STUDIO_URL, api_key="lm-studio")
-    results = []
-    for case in dataset["test_cases"]:
-        section = SectionData(**case["section"])
-        start = time.monotonic()
-        summary = await summarize_section(
-            section, client,
-            model=config["model"],
-            temperature=config["temperature"],
-            enable_thinking=config["enable_thinking"],
-            max_summary_tokens=config["max_tokens"],
-        )
-        duration_ms = int((time.monotonic() - start) * 1000)
-        results.append({
-            "case_id": case["id"],
-            "config": config["name"],
-            "summary": summary,
-            "duration_ms": duration_ms,
-            "summary_tokens": len(summary.split()),  # rough estimate
-        })
-    return results
-```
-
-CLI:
 ```bash
-python -m evals.model_config.runner --dataset summarization [--llm-grading] [--delay 1]
+conda run -n knowledge-agents pip install graphiti-memory
 ```
 
-Runs each config × each test case, saves results as timestamped JSON.
+Create database:
+```cypher
+CREATE DATABASE graphiti IF NOT EXISTS
+```
 
-### Step 5: Create eval scorer
+### Step 2: Create a spike script
 
-**File:** `evals/model_config/scorer.py`
+**New file:** `scripts/spike_graphiti.py`
 
-Score each summary on:
+A standalone script that:
+1. Initializes Graphiti with our Neo4j + LM Studio
+2. Reads 5-10 NotePlan sections from our existing Neo4j
+3. Ingests each section as a Graphiti episode
+4. Queries the resulting graph
+5. Compares entity extraction quality vs our current pipeline
 
-| Dimension | Method | Score Range |
-|-----------|--------|------------|
-| **Completeness** | LLM grading (Haiku) | 0.0 - 1.0 |
-| **Conciseness** | Token ratio (summary / input) — lower is better | 0.0 - 1.0 |
-| **Faithfulness** | LLM grading (does it hallucinate?) | 0.0 - 1.0 |
-| **Gold similarity** | ROUGE-L or BERTScore vs gold summary | 0.0 - 1.0 |
-| **Latency** | Raw ms (lower is better) | raw value |
-| **Token cost** | Total tokens used (thinking overhead) | raw value |
-
-For gold similarity, use simple word overlap (no heavy ML dependencies):
 ```python
-def rouge_l_score(candidate, reference):
-    """Simple ROUGE-L F1 using longest common subsequence."""
+from graphiti_core import Graphiti
+from graphiti_core.llm_client import OpenAIGenericClient, LLMConfig
+from graphiti_core.embedder import OpenAIEmbedder, EmbedderConfig
+
+# Point to LM Studio for LLM
+llm_client = OpenAIGenericClient(LLMConfig(
+    api_key="lm-studio",
+    base_url="http://mac-studio.local:1234/v1",
+    model="qwen3.5-9b",
+))
+
+# Point to LM Studio for embeddings
+embedder = OpenAIEmbedder(EmbedderConfig(
+    api_key="lm-studio",
+    base_url="http://mac-studio.local:1234/v1",
+    model="text-embedding-qwen3-embedding-8b",
+))
+
+# Initialize with separate database
+graphiti = Graphiti(
+    "bolt://localhost:7687", "neo4j", "knowledge123",
+    llm_client=llm_client,
+    embedder=embedder,
+)
+
+# Define custom entity types matching our schema
+from pydantic import BaseModel
+
+class PersonEntity(BaseModel):
+    email: str = ""
+    role: str = ""
+
+class ProjectEntity(BaseModel):
+    repo: str = ""
+    status: str = ""
+
+class ToolEntity(BaseModel):
+    homepage: str = ""
+
+entity_types = {
+    "Person": PersonEntity,
+    "Project": ProjectEntity,
+    "Tool": ToolEntity,
+}
+
+# Ingest a NotePlan section as an episode
+await graphiti.add_episode(
+    name="Moving Faster",
+    episode_body="* Tokens / Claude Access\n* API Key?...",
+    source_description="NotePlan Calendar/20260323.md",
+    reference_time=datetime(2026, 3, 23),
+    entity_types=entity_types,
+)
+
+# Search
+results = await graphiti.search("Claude access tokens")
 ```
 
-### Step 6: Create comparison report
+### Step 3: Define evaluation criteria
 
-**File:** `evals/model_config/report.py`
+Compare Graphiti output vs our current pipeline on the same 10 sections used in model config evals:
 
-Generate a markdown comparison table:
-```
-## Model Config Eval Report
+| Dimension | How to measure |
+|-----------|---------------|
+| **Entity extraction quality** | Count entities found, check for missed/hallucinated ones |
+| **Entity resolution** | Does Graphiti merge "AI Agent" and "AI Agents" as one entity? |
+| **Relationship richness** | Are relationships more specific than our generic RELATED_TO? |
+| **Temporal tracking** | Does it correctly handle facts that change across notes? |
+| **Search quality** | Compare `graphiti.search()` vs our Cypher queries for same queries |
+| **Structured output reliability** | How often does Qwen3.5-9B produce valid JSON for Graphiti? |
+| **Latency** | Time per episode ingestion vs our `build_knowledge_graph` tool |
 
-| Config | Completeness | Conciseness | Faithfulness | Similarity | Avg Latency | Tokens |
-|--------|-------------|-------------|-------------|-----------|------------|--------|
-| 35b-t0.5-nothink | 0.85 | 0.90 | 0.95 | 0.78 | 1200ms | 950 |
-| 35b-t0.3-nothink | 0.82 | 0.92 | 0.97 | 0.80 | 1100ms | 920 |
-| 35b-t0.7-nothink | 0.88 | 0.85 | 0.90 | 0.75 | 1300ms | 980 |
-| 35b-t0.5-think   | 0.92 | 0.88 | 0.96 | 0.82 | 5500ms | 3200 |
-| 9b-t0.5-nothink  | 0.78 | 0.91 | 0.88 | 0.70 | 600ms  | 400 |
+### Step 4: Run the spike and collect results
 
-Winner: [config with best quality/speed balance]
-```
+Run `scripts/spike_graphiti.py` against the 10 eval sections. Save results as JSON for comparison.
 
-### Step 7: Makefile targets
+Post results to Langfuse with trace name `graphiti-eval` for visual comparison alongside our existing `model-eval` traces.
 
-```makefile
-model-eval:           ## Run model config eval sweep
-model-eval-report:    ## Generate comparison report from latest results
-```
+### Step 5: Document findings
 
-### Step 8: Post scores to Langfuse
-
-Each eval result gets pushed to Langfuse as **scored traces**, enabling visual comparison in the Langfuse dashboard:
-
-1. **Each summarization call** creates a Langfuse generation trace (already wired)
-2. **After scoring**, the runner posts scores back to the trace via Langfuse SDK:
-```python
-langfuse = get_langfuse()
-# For each scored result:
-langfuse.score_current_trace(name="completeness", value=0.85, comment="LLM graded")
-langfuse.score_current_trace(name="conciseness", value=0.92, comment="token ratio")
-langfuse.score_current_trace(name="faithfulness", value=0.97, comment="LLM graded")
-langfuse.score_current_trace(name="gold_similarity", value=0.80, comment="ROUGE-L")
-```
-
-3. **Config metadata** is attached to each trace:
-```python
-trace.update(metadata={"config": config["name"], "eval_run": run_id})
-```
-
-4. **Langfuse dashboard** then shows:
-- Filter by config name → see all traces for that config
-- Compare score distributions across configs (completeness, conciseness, etc.)
-- Drill into individual traces to see input/output/summary side-by-side
-- Export scores as CSV for external analysis
-
-5. **Create Langfuse dataset** for reproducibility:
-```python
-# Create a dataset from the test cases
-dataset = langfuse.create_dataset(name="summarization-eval-v1")
-for case in test_cases:
-    langfuse.create_dataset_item(
-        dataset_name="summarization-eval-v1",
-        input=case["section"]["raw_text"],
-        expected_output=case["gold_summary"],
-        metadata=case["grading"],
-    )
-```
-
-This means: **all eval data lives in Langfuse**, not just local JSON files. The JSON results still saved locally as backup, but Langfuse is the primary analysis tool.
+Write up results in `docs/TECH_DESIGN.md` under a new "Graphiti Evaluation" section:
+- What worked well
+- What didn't (structured output failures, missing features)
+- Recommendation: adopt, augment, or skip
+- If adopting: migration plan for replacing graph_utils.py
 
 ## Critical Files
 
 | File | Action |
 |------|--------|
-| `src/knowledge_agents/services/summarizer.py` | Add temperature + thinking params |
-| `evals/model_config/runner.py` | New: config sweep runner |
-| `evals/model_config/scorer.py` | New: summarization quality scorer |
-| `evals/model_config/report.py` | New: comparison report generator |
-| `evals/model_config/configs.py` | New: config matrix definition |
-| `evals/model_config/datasets/summarization.json` | New: test sections + gold summaries |
-| `Makefile` | Add model-eval targets |
+| `scripts/spike_graphiti.py` | New: evaluation spike script |
+| `docs/TECH_DESIGN.md` | Update with findings |
+| `docs/MODEL_DECISIONS.md` | If switching graph approach, record decision |
 
 ## Verification
 
-1. Refactor test: `conda run -n knowledge-agents pytest tst/unit/claude_agent/ -q -m unit`
-2. Generate dataset: pull sections from Neo4j, generate gold summaries
-3. Run single config: `python -m evals.model_config.runner --config "35b-a3b-t0.5-nothink"`
-4. Run full sweep: `python -m evals.model_config.runner` (all configs × all cases)
-5. Generate report: `python -m evals.model_config.report`
-6. Check Langfuse: verify per-config traces appear with metadata
-7. Pick winner and update `docs/MODEL_DECISIONS.md`
+1. `pip install graphiti-memory` succeeds
+2. `spike_graphiti.py` ingests 10 sections without crashing
+3. Entities appear in Neo4j `graphiti` database
+4. Search returns relevant results
+5. Comparison table shows measurable differences vs current pipeline
+6. Results logged in Langfuse
+
+## Decision Criteria
+
+**Adopt Graphiti if:**
+- Structured output works reliably with Qwen3.5-9B (>90% valid JSON)
+- Entity resolution catches duplicates our pipeline misses
+- Temporal tracking adds value for note evolution
+- Search quality is meaningfully better
+
+**Keep current pipeline if:**
+- Structured output fails frequently with local LLMs
+- Graphiti's schema is too rigid for our NotePlan-specific features
+- The overhead of maintaining two graph approaches isn't worth it
+- Performance is significantly worse (>3x slower per episode)
