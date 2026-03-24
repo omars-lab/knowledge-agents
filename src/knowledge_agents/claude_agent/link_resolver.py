@@ -74,6 +74,11 @@ NODE_SCHEMA: dict[str, NodeTypeConfig] = {
         color="#FFD6D6",
         link_properties=["note_file_path"],
     ),
+    "Episode": NodeTypeConfig(
+        color="#E8F5E9",
+        shape="box",
+        link_properties=["source_description"],
+    ),
 }
 
 DEFAULT_COLOR = "#D3D3D3"

@@ -52,17 +52,19 @@ def query_neo4j(driver, database, cypher):
 
 
 def build_entity_graph(driver, database, entity_name, limit=50):
-    """Get all connections for a specific entity."""
+    """Get all connections for a specific entity (supports Graphiti + legacy)."""
     cypher = f"""
     MATCH (e:Entity {{name: '{entity_name}'}})-[r]-(connected)
-    RETURN e.name AS from_name, e.type AS from_type,
+    RETURN e.name AS from_name,
+           COALESCE(head([l IN labels(e) WHERE l <> 'Entity']), 'Entity') AS from_type,
            type(r) AS rel_type,
            CASE WHEN connected:Entity THEN connected.name
                 WHEN connected:Note THEN connected.file_path
+                WHEN connected:Episodic THEN connected.name
                 ELSE 'unknown' END AS to_name,
-           CASE WHEN connected:Entity THEN connected.type
-                WHEN connected:Note THEN 'Note'
-                ELSE 'unknown' END AS to_type,
+           CASE WHEN connected:Note THEN 'Note'
+                WHEN connected:Episodic THEN 'Episode'
+                ELSE COALESCE(head([l IN labels(connected) WHERE l <> 'Entity']), 'Entity') END AS to_type,
            properties(e) AS from_props,
            properties(connected) AS to_props
     LIMIT {limit}
@@ -71,16 +73,26 @@ def build_entity_graph(driver, database, entity_name, limit=50):
 
 
 def build_all_graph(driver, database, limit=50):
-    """Get the full graph including Note → Entity CONTAINS relationships."""
+    """Get the full graph — supports both Graphiti and legacy schemas."""
+    # Graphiti schema: Entity nodes with RELATES_TO edges + Episodic MENTIONS
     cypher = f"""
     MATCH (n)-[r]->(m)
-    WHERE (n:Entity OR n:Note) AND (m:Entity OR m:Note)
+    WHERE (n:Entity OR n:Note OR n:Episodic) AND (m:Entity OR m:Note OR m:Episodic)
+    AND type(r) IN ['RELATES_TO', 'MENTIONS', 'CONTAINS', 'HAS_SECTION', 'HAS_MEMBER']
     RETURN
-        CASE WHEN n:Note THEN n.file_path ELSE n.name END AS from_name,
-        CASE WHEN n:Note THEN 'Note' ELSE n.type END AS from_type,
+        CASE WHEN n:Note THEN n.file_path
+             WHEN n:Episodic THEN n.name
+             ELSE n.name END AS from_name,
+        CASE WHEN n:Note THEN 'Note'
+             WHEN n:Episodic THEN 'Episode'
+             ELSE COALESCE(head([l IN labels(n) WHERE l <> 'Entity']), 'Entity') END AS from_type,
         type(r) AS rel_type,
-        CASE WHEN m:Note THEN m.file_path ELSE m.name END AS to_name,
-        CASE WHEN m:Note THEN 'Note' ELSE m.type END AS to_type,
+        CASE WHEN m:Note THEN m.file_path
+             WHEN m:Episodic THEN m.name
+             ELSE m.name END AS to_name,
+        CASE WHEN m:Note THEN 'Note'
+             WHEN m:Episodic THEN 'Episode'
+             ELSE COALESCE(head([l IN labels(m) WHERE l <> 'Entity']), 'Entity') END AS to_type,
         properties(n) AS from_props,
         properties(m) AS to_props
     LIMIT {limit}
