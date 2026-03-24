@@ -112,7 +112,7 @@ def phase_parse(
 async def phase_summarize(
     sections: list[SectionData],
     stats: PipelineStats,
-    model: str = "lm_studio/qwen3.5-35b-a3b",
+    model: str = "qwen3.5-35b-a3b",
     concurrency: int = 3,
     min_tokens: int = 200,
     delay: float = 0.5,
@@ -275,7 +275,7 @@ async def seed_sections(
     concurrency: int = 3,
     embedding_batch_size: int = 10,
     delay: float = 0.5,
-    summarize_model: str = "lm_studio/qwen3.5-35b-a3b",
+    summarize_model: str = "qwen3.5-35b-a3b",
 ) -> PipelineStats:
     """Main pipeline: parse → summarize → embed → store."""
     stats = PipelineStats()
@@ -389,7 +389,7 @@ def main():
     parser = argparse.ArgumentParser(description="Section-level note indexing pipeline")
     parser.add_argument("--noteplan-dir", type=Path, required=True, help="NotePlan root directory")
     parser.add_argument("--summarize", action="store_true", help="Enable LLM summarization")
-    parser.add_argument("--summarize-model", default="lm_studio/qwen3.5-35b-a3b", help="Model for summarization")
+    parser.add_argument("--summarize-model", default="qwen3.5-35b-a3b", help="Model for summarization")
     parser.add_argument("--full-reindex", action="store_true", help="Re-index all files (ignore delta)")
     parser.add_argument("--concurrency", type=int, default=3, help="Max parallel LLM calls (default: 3)")
     parser.add_argument("--batch-size", type=int, default=10, help="Embedding batch size (default: 10)")

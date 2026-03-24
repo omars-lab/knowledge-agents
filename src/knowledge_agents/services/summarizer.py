@@ -17,12 +17,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Default LiteLLM proxy config
-DEFAULT_PROXY_URL = "http://localhost:4000/v1"
-DEFAULT_PROXY_KEY = "sk-1234"
-DEFAULT_MODEL = "lm_studio/qwen3.5-35b-a3b"
+# LM Studio direct (bypass LiteLLM — needed for chat_template_kwargs passthrough)
+DEFAULT_LM_STUDIO_URL = "http://mac-studio.local:1234/v1"
+DEFAULT_LM_STUDIO_KEY = "lm-studio"
+DEFAULT_MODEL = "qwen3.5-35b-a3b"
 DEFAULT_MIN_TOKENS = 200
-DEFAULT_MAX_SUMMARY_TOKENS = 200
+# Qwen3.5 uses ~800-1000 tokens for internal reasoning even with enable_thinking=false
+# The actual summary is ~50-100 tokens, but we need headroom for the thinking overhead
+DEFAULT_MAX_SUMMARY_TOKENS = 2000
 
 
 async def summarize_section(
@@ -40,6 +42,7 @@ async def summarize_section(
     response = await client.chat.completions.create(
         model=model,
         max_tokens=max_summary_tokens,
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
         messages=[
             {
                 "role": "system",
@@ -51,15 +54,16 @@ async def summarize_section(
             },
         ],
     )
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content or ""
+    return content.strip()
 
 
 async def summarize_sections_batch(
     sections: list["SectionData"],
     *,
     model: str = DEFAULT_MODEL,
-    proxy_url: str = DEFAULT_PROXY_URL,
-    proxy_key: str = DEFAULT_PROXY_KEY,
+    proxy_url: str = DEFAULT_LM_STUDIO_URL,
+    proxy_key: str = DEFAULT_LM_STUDIO_KEY,
     concurrency: int = 3,
     min_tokens: int = DEFAULT_MIN_TOKENS,
     delay_between_batches: float = 0.5,

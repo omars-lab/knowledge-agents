@@ -69,7 +69,11 @@ Search the LM Studio catalog for candidate models by task type:
 
 ```bash
 # Search by task-relevant keywords — check what's ACTUALLY available
+# Use --quiet to suppress interactive prompts (output shows selection list)
 ssh -o ConnectTimeout=5 mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' get '<search-term>' --quiet 2>&1" | head -20
+
+# To download: use Staff Pick name + @quantization (NOT repo paths)
+# Example: 'Qwen3.5-35B-A3B@q4_k_m' NOT 'lmstudio-community/Qwen3.5-35B-A3B-GGUF'
 ```
 
 **Search terms by task type:**
@@ -170,9 +174,16 @@ Format your recommendation as:
 ### Installation
 To install and load:
 \`\`\`bash
-ssh mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' get '[model-name]' --yes"
-ssh mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' load --yes '[model-path]'"
+# Download — use Staff Pick name + @quantization (case-sensitive!)
+# Format: 'ModelName@quantization' e.g. 'Qwen3.5-35B-A3B@q4_k_m'
+# DO NOT use repo paths like 'lmstudio-community/...' — they fail with lms CLI
+ssh mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' get '[ModelName]@[quantization]' --yes"
+
+# Load after download completes
+ssh mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms' load --yes '[model-identifier]'"
 \`\`\`
+
+**Common quantization suffixes:** `@q4_k_m` (default), `@q5_k_m`, `@q8_0`, `@q3_k_m`
 
 ### Files to Update (MANDATORY after model change)
 After changing a model, update ALL of these:
