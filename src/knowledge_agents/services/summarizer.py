@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 
 from openai import AsyncOpenAI
 
+from ..utils.langfuse_trace import get_langfuse
+
 if TYPE_CHECKING:
     from ..types.section import SectionData
 
@@ -100,11 +102,29 @@ async def summarize_sections_batch(
         concurrency,
     )
 
+    # Langfuse: parent trace for the batch
+    langfuse = get_langfuse()
+    batch_trace = None
+    if langfuse:
+        batch_trace = langfuse.trace(
+            name="summarize_batch",
+            metadata={"total": len(sections), "to_summarize": len(to_summarize), "model": model},
+        )
+
     async def _summarize_one(section: "SectionData") -> None:
         async with semaphore:
             try:
                 section.summary = await summarize_section(section, client, model)
                 logger.debug("Summarized: %s (%d tokens)", section.section_id, section.token_count)
+                # Langfuse: record generation
+                if batch_trace and section.summary:
+                    batch_trace.generation(
+                        name="summarize_section",
+                        model=model,
+                        input=section.raw_text[:500],
+                        output=section.summary,
+                        metadata={"section_id": section.section_id, "token_count": section.token_count},
+                    )
             except Exception as e:
                 logger.warning("Summarization failed for %s: %s", section.section_id, e)
                 section.summary = None

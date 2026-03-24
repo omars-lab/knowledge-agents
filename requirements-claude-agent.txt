@@ -28,3 +28,6 @@ httpx>=0.24.0
 
 # Metrics
 prometheus_client>=0.20.0
+
+# LLM Observability (Langfuse tracing)
+langfuse>=2.0.0

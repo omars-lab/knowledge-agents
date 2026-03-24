@@ -24,6 +24,7 @@ from claude_agent_sdk.types import (
     ToolUseBlock,
 )
 
+from ..utils.langfuse_trace import get_langfuse
 from .config import ClaudeAgentSettings
 from .prompts import get_system_prompt
 from .tools import TOOL_NAMES, create_notes_mcp_server
@@ -180,6 +181,17 @@ async def stream_agent_response(
 
     logger.info("stream_agent_response starting — message=%r", message[:120])
 
+    # Langfuse trace (no-op if not configured)
+    langfuse = get_langfuse()
+    trace = None
+    if langfuse:
+        trace = langfuse.trace(
+            name="chat",
+            input=message,
+            session_id=session_id or "new",
+            metadata={"model": settings.claude_model or "default", "max_turns": settings.max_turns},
+        )
+
     try:
         async for msg in query(prompt=message, options=options):
             msg_count += 1
@@ -217,6 +229,9 @@ async def stream_agent_response(
                             current_tool,
                             len(tool_input),
                         )
+                        # Langfuse: record tool call
+                        if trace:
+                            trace.span(name=current_tool, input=tool_input[:500])
                         yield {
                             "type": "tool_complete",
                             "name": current_tool,
@@ -242,6 +257,19 @@ async def stream_agent_response(
                     msg_count,
                     elapsed_ms,
                 )
+
+                # Langfuse: update trace with result
+                if trace:
+                    trace.update(
+                        output=collected_text[:1000],
+                        metadata={
+                            "session_id": result_session_id,
+                            "cost_usd": msg.total_cost_usd or 0,
+                            "turns": msg.num_turns,
+                            "duration_ms": elapsed_ms,
+                            "tools_used": [tc["name"] for tc in tool_calls],
+                        },
+                    )
 
                 # Write session workspace artifacts
                 try:

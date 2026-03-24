@@ -661,3 +661,17 @@ observability-down: ## Stop observability stack
 
 grafana-open: ## Open Grafana dashboard in browser
 	@open http://localhost:3001 2>/dev/null || echo "Open: http://localhost:3001"
+
+langfuse-up: ## Start Langfuse LLM observability (shares existing Postgres)
+	@echo "🔍 Starting Langfuse..."
+	@docker compose up -d langfuse
+	@echo "⏳ Waiting for Langfuse to be healthy..."
+	@for i in 1 2 3 4 5 6 7 8 9 10 11 12; do \
+		curl -sf http://localhost:3210/api/public/health >/dev/null 2>&1 && echo "✅ Langfuse: http://localhost:3210 (admin@local / knowledge123)" && break || sleep 5; \
+	done
+
+langfuse-down: ## Stop Langfuse
+	docker compose stop langfuse
+
+langfuse-open: ## Open Langfuse UI in browser
+	@open http://localhost:3210 2>/dev/null || echo "Open: http://localhost:3210"
