@@ -228,6 +228,7 @@ These documents must be kept up to date as features are added or changed:
 - **`docs/TECH_DESIGN.md`** -- When making architecture decisions, changing models, or modifying infrastructure
 - **`docs/SECTION_INDEXING_PIPELINE.md`** -- When changing the section indexing pipeline, models, storage schema, or CLI flags
 - **`docs/MODEL_DECISIONS.md`** -- When changing LM Studio models; record decision, rationale, benchmarks, and links
+- **`docs/GRAPHITI_INTEGRATION.md`** -- When modifying Graphiti integration, adding use cases, or updating the integration plan
 - **`CLAUDE.md`** -- When adding new commands, conventions, or architectural patterns
 - **`DEVELOPMENT.md`** -- When changing build/test workflows or architecture
 - **`README.md`** -- When changing setup instructions or project overview
