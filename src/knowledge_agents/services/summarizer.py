@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from openai import AsyncOpenAI
 
-from ..utils.langfuse_trace import get_langfuse
+from ..utils.langfuse_trace import create_trace, start_generation
 
 if TYPE_CHECKING:
     from ..types.section import SectionData
@@ -102,14 +102,13 @@ async def summarize_sections_batch(
         concurrency,
     )
 
-    # Langfuse: parent trace for the batch
-    langfuse = get_langfuse()
-    batch_trace = None
-    if langfuse:
-        batch_trace = langfuse.trace(
-            name="summarize_batch",
-            metadata={"total": len(sections), "to_summarize": len(to_summarize), "model": model},
-        )
+    # Langfuse: parent trace for the batch (no-op if not configured)
+    batch_trace_ctx = create_trace(
+        "summarize_batch",
+        metadata={"total": len(sections), "to_summarize": len(to_summarize), "model": model},
+    )
+    if batch_trace_ctx:
+        batch_trace_ctx.__enter__()
 
     async def _summarize_one(section: "SectionData") -> None:
         async with semaphore:
@@ -117,14 +116,17 @@ async def summarize_sections_batch(
                 section.summary = await summarize_section(section, client, model)
                 logger.debug("Summarized: %s (%d tokens)", section.section_id, section.token_count)
                 # Langfuse: record generation
-                if batch_trace and section.summary:
-                    batch_trace.generation(
-                        name="summarize_section",
+                if batch_trace_ctx and section.summary:
+                    gen = start_generation(
+                        "summarize_section",
                         model=model,
                         input=section.raw_text[:500],
                         output=section.summary,
                         metadata={"section_id": section.section_id, "token_count": section.token_count},
                     )
+                    if gen:
+                        gen.__enter__()
+                        gen.__exit__(None, None, None)
             except Exception as e:
                 logger.warning("Summarization failed for %s: %s", section.section_id, e)
                 section.summary = None
@@ -141,6 +143,12 @@ async def summarize_sections_batch(
 
     summarized = sum(1 for s in sections if s.summary is not None)
     logger.info("Summarization complete: %d/%d sections summarized", summarized, len(sections))
+
+    if batch_trace_ctx:
+        try:
+            batch_trace_ctx.__exit__(None, None, None)
+        except Exception:
+            pass
 
     await client.close()
     return sections

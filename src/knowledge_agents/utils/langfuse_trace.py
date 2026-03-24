@@ -1,7 +1,7 @@
 """
-Langfuse tracing utility for LLM observability.
+Langfuse tracing utility for LLM observability (v4 SDK).
 
-Provides a thin wrapper around the Langfuse SDK with graceful degradation.
+Provides a thin wrapper around the Langfuse v4 SDK with graceful degradation.
 If Langfuse is not configured or unreachable, all trace functions are no-ops.
 
 Usage:
@@ -9,15 +9,15 @@ Usage:
 
     langfuse = get_langfuse()
     if langfuse:
-        trace = langfuse.trace(name="chat", input=message)
-        trace.generation(name="llm_call", model=model, input=prompt, output=response)
-        trace.update(output=final_response)
+        with langfuse.start_as_current_observation(type="trace", name="chat", input=msg):
+            with langfuse.start_as_current_observation(type="span", name="tool_call"):
+                ...
+            langfuse.update_current_generation(output=response)
 """
 from __future__ import annotations
 
 import logging
 import os
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +57,8 @@ def get_langfuse():
             secret_key=secret_key,
             host=host,
         )
-        # Quick connectivity check
         _client.auth_check()
-        logger.info("Langfuse connected at %s", host)
+        logger.info("Langfuse connected at %s (v4 SDK)", host)
     except ImportError:
         logger.info("Langfuse SDK not installed — tracing disabled")
         _client = None
@@ -68,6 +67,67 @@ def get_langfuse():
         _client = None
 
     return _client
+
+
+def create_trace(name: str, **kwargs):
+    """Create a trace observation. Returns a context manager or None.
+
+    Usage:
+        trace_ctx = create_trace("chat", input=msg)
+        if trace_ctx:
+            with trace_ctx:
+                # ... do work ...
+                pass
+    """
+    client = get_langfuse()
+    if not client:
+        return None
+    try:
+        return client.start_as_current_observation(
+            name=name, as_type="span", **kwargs
+        )
+    except Exception as e:
+        logger.debug("Failed to create Langfuse trace: %s", e)
+        return None
+
+
+def start_span(name: str, **kwargs):
+    """Start a span within the current trace. Returns context manager or None."""
+    client = get_langfuse()
+    if not client:
+        return None
+    try:
+        return client.start_as_current_observation(
+            name=name, as_type="tool", **kwargs
+        )
+    except Exception as e:
+        logger.debug("Failed to start Langfuse span: %s", e)
+        return None
+
+
+def start_generation(name: str, **kwargs):
+    """Start a generation (LLM call) within current trace. Returns context manager or None."""
+    client = get_langfuse()
+    if not client:
+        return None
+    try:
+        return client.start_as_current_observation(
+            name=name, as_type="generation", **kwargs
+        )
+    except Exception as e:
+        logger.debug("Failed to start Langfuse generation: %s", e)
+        return None
+
+
+def score_current(name: str, value: float, **kwargs):
+    """Score the current trace."""
+    client = get_langfuse()
+    if not client:
+        return
+    try:
+        client.score_current_trace(name=name, value=value, **kwargs)
+    except Exception as e:
+        logger.debug("Failed to score trace: %s", e)
 
 
 def flush():

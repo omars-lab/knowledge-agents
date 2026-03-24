@@ -24,7 +24,7 @@ from claude_agent_sdk.types import (
     ToolUseBlock,
 )
 
-from ..utils.langfuse_trace import get_langfuse
+from ..utils.langfuse_trace import get_langfuse, flush as langfuse_flush
 from .config import ClaudeAgentSettings
 from .prompts import get_system_prompt
 from .tools import TOOL_NAMES, create_notes_mcp_server
@@ -181,16 +181,18 @@ async def stream_agent_response(
 
     logger.info("stream_agent_response starting — message=%r", message[:120])
 
-    # Langfuse trace (no-op if not configured)
+    # Langfuse trace (non-context-manager approach for async generators)
     langfuse = get_langfuse()
     trace = None
     if langfuse:
-        trace = langfuse.trace(
-            name="chat",
-            input=message,
-            session_id=session_id or "new",
-            metadata={"model": settings.claude_model or "default", "max_turns": settings.max_turns},
-        )
+        try:
+            trace = langfuse.start_observation(
+                name="chat",
+                input=message,
+                metadata={"model": settings.claude_model or "default", "max_turns": settings.max_turns, "session_id": session_id or "new"},
+            )
+        except Exception as e:
+            logger.debug("Failed to create Langfuse trace: %s", e)
 
     try:
         async for msg in query(prompt=message, options=options):
@@ -231,7 +233,14 @@ async def stream_agent_response(
                         )
                         # Langfuse: record tool call
                         if trace:
-                            trace.span(name=current_tool, input=tool_input[:500])
+                            try:
+                                tool_obs = langfuse.start_observation(
+                                    name=current_tool, as_type="tool", input=tool_input[:500],
+                                    trace_context=trace,
+                                )
+                                tool_obs.end()
+                            except Exception:
+                                pass
                         yield {
                             "type": "tool_complete",
                             "name": current_tool,
@@ -258,18 +267,21 @@ async def stream_agent_response(
                     elapsed_ms,
                 )
 
-                # Langfuse: update trace with result
+                # Langfuse: end trace with result
                 if trace:
-                    trace.update(
-                        output=collected_text[:1000],
-                        metadata={
-                            "session_id": result_session_id,
-                            "cost_usd": msg.total_cost_usd or 0,
-                            "turns": msg.num_turns,
-                            "duration_ms": elapsed_ms,
-                            "tools_used": [tc["name"] for tc in tool_calls],
-                        },
-                    )
+                    try:
+                        trace.end(
+                            output=collected_text[:1000],
+                            metadata={
+                                "session_id": result_session_id,
+                                "cost_usd": msg.total_cost_usd or 0,
+                                "turns": msg.num_turns,
+                                "duration_ms": elapsed_ms,
+                                "tools_used": [tc["name"] for tc in tool_calls],
+                            },
+                        )
+                    except Exception:
+                        pass
 
                 # Write session workspace artifacts
                 try:
@@ -344,6 +356,13 @@ async def stream_agent_response(
             exc_info=True,
         )
         raise
+    finally:
+        if trace:
+            try:
+                trace.end()
+            except Exception:
+                pass
+            langfuse_flush()
 
 
 async def run_agent_buffered(
