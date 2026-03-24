@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # LM Studio config
 LM_STUDIO_URL = "http://mac-studio.local:1234/v1"
 LM_STUDIO_KEY = "lm-studio"
-LLM_MODEL = "qwen3.5-9b"
+LLM_MODEL = "qwen3.5-35b-a3b"  # 35B for structured output; 9B fails (routing bug)
 EMBED_MODEL = "text-embedding-qwen3-embedding-8b"
 
 # Neo4j
@@ -73,41 +73,45 @@ async def run_spike():
     from pydantic import BaseModel as PydanticBaseModel
     from openai.types.chat import ChatCompletionMessageParam
 
-    # Custom client that disables thinking mode for Qwen3.5
-    # Monkey-patch the parent's _generate_response to inject extra_body
-    _orig_generate = OpenAIGenericClient._generate_response
+    # Custom client for Qwen3.5 on LM Studio:
+    # - Do NOT use response_format (json_schema conflicts with thinking mode → empty content)
+    # - Instead, let the model think naturally and produce JSON via prompt instruction
+    # - Parse JSON from the content field (model produces valid JSON when prompted)
 
     class LMStudioClient(OpenAIGenericClient):
         async def _generate_response(self, messages, response_model=None, max_tokens=DEFAULT_MAX_TOKENS, model_size=ModelSize.medium):
-            # Build messages the same way the parent does
+            import json as json_mod
+
             openai_messages = []
             for m in messages:
                 m.content = self._clean_input(m.content)
+                # Inject JSON instruction into system messages
+                if m.role == 'system' and response_model is not None:
+                    schema = response_model.model_json_schema()
+                    m.content += f"\n\nYou MUST respond with ONLY valid JSON matching this schema:\n{json_mod.dumps(schema, indent=2)}"
                 openai_messages.append({'role': m.role, 'content': m.content})
-
-            response_format: dict[str, typing.Any] = {'type': 'json_object'}
-            if response_model is not None:
-                schema_name = getattr(response_model, '__name__', 'structured_response')
-                json_schema = response_model.model_json_schema()
-                response_format = {
-                    'type': 'json_schema',
-                    'json_schema': {'name': schema_name, 'schema': json_schema},
-                }
 
             response = await self.client.chat.completions.create(
                 model=self.model or LLM_MODEL,
                 messages=openai_messages,
                 temperature=self.temperature,
-                max_tokens=max_tokens,
-                response_format=response_format,
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+                max_tokens=max(max_tokens, 8000),
+                # NO response_format — it conflicts with thinking mode
+                # NO enable_thinking override — let the model think naturally
             )
 
             content = response.choices[0].message.content or ''
             if not content.strip():
-                raise ValueError("LLM returned empty content (thinking mode may be consuming all tokens)")
+                raise ValueError("LLM returned empty content")
 
-            import json as json_mod
+            # Strip any markdown code fences
+            content = content.strip()
+            if content.startswith('```'):
+                content = content.split('\n', 1)[1] if '\n' in content else content[3:]
+            if content.endswith('```'):
+                content = content.rsplit('```', 1)[0]
+            content = content.strip()
+
             return json_mod.loads(content)
 
     logger.info("=== Graphiti Spike ===")
