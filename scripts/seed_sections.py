@@ -19,6 +19,7 @@ import json
 import logging
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Add src to path
@@ -167,11 +168,12 @@ def phase_embed(
 
 # ── Phase D: Store ──────────────────────────────────────────────────────
 
-def phase_store(
+async def phase_store(
     sections: list[SectionData],
     stats: PipelineStats,
     qdrant: QdrantClient,
     neo4j_driver,
+    graphiti=None,
 ) -> None:
     """Store sections in Qdrant and Neo4j."""
     # Group sections by file
@@ -218,27 +220,41 @@ def phase_store(
                 stats.errors.append(f"Qdrant upsert {file_path}: {e}")
                 logger.warning("Qdrant upsert failed for %s: %s", file_path, e)
 
-        # ── Neo4j: create Section nodes ──
-        section_dicts = [
-            {
-                "section_id": s.section_id,
-                "section_index": s.section_index,
-                "heading": s.heading,
-                "heading_level": s.heading_level,
-                "heading_path": s.heading_path,
-                "raw_text": s.raw_text,
-                "summary": s.summary,
-                "token_count": s.token_count,
-                "content_hash": s.content_hash,
-            }
-            for s in file_sections
-        ]
-
-        try:
-            create_section_nodes(neo4j_driver, file_path, section_dicts, NEO4J_DB)
-        except Exception as e:
-            stats.errors.append(f"Neo4j sections {file_path}: {e}")
-            logger.warning("Neo4j section create failed for %s: %s", file_path, e)
+        # ── Graphiti: ingest sections as episodes (automatic entity extraction) ──
+        if graphiti:
+            for s in file_sections:
+                try:
+                    await graphiti.add_episode(
+                        name=s.heading or f"Section {s.section_index}",
+                        episode_body=s.raw_text,
+                        source_description=f"NotePlan {s.file_path} :: {s.heading_path}" if s.heading_path else f"NotePlan {s.file_path}",
+                        reference_time=datetime.now(timezone.utc),
+                        group_id="noteplan",
+                    )
+                    stats.entities_linked += 1  # approximate — Graphiti extracts automatically
+                except Exception as e:
+                    stats.errors.append(f"Graphiti episode {s.section_id}: {e}")
+                    logger.warning("Graphiti episode failed for %s: %s", s.section_id, e)
+        else:
+            # Fallback: create Section nodes manually (if Graphiti unavailable)
+            section_dicts = [
+                {
+                    "section_id": s.section_id,
+                    "section_index": s.section_index,
+                    "heading": s.heading,
+                    "heading_level": s.heading_level,
+                    "heading_path": s.heading_path,
+                    "raw_text": s.raw_text,
+                    "summary": s.summary,
+                    "token_count": s.token_count,
+                    "content_hash": s.content_hash,
+                }
+                for s in file_sections
+            ]
+            try:
+                create_section_nodes(neo4j_driver, file_path, section_dicts, NEO4J_DB)
+            except Exception as e:
+                stats.errors.append(f"Neo4j sections {file_path}: {e}")
 
         # ── Update Note.content_hash ──
         if file_sections:
@@ -251,19 +267,6 @@ def phase_store(
                     )
             except Exception:
                 pass  # non-critical
-
-        # ── Link sections to entities ──
-        if entity_names:
-            entity_set = set(entity_names)
-            for s in file_sections:
-                # Simple substring match: find entity names in section text
-                found = [name for name in entity_set if name.lower() in s.raw_text.lower()]
-                if found:
-                    try:
-                        linked = link_section_entities(neo4j_driver, s.section_id, found, NEO4J_DB)
-                        stats.entities_linked += linked
-                    except Exception:
-                        pass  # non-critical
 
 
 # ── Main ────────────────────────────────────────────────────────────────
@@ -284,6 +287,18 @@ async def seed_sections(
     # ── Init clients ──
     qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
     neo4j_driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
+
+    # Graphiti (optional — graceful degradation if unavailable)
+    graphiti = None
+    try:
+        from knowledge_agents.claude_agent.graphiti_client import get_graphiti
+        graphiti = await get_graphiti()
+        if graphiti:
+            print("🔗 Graphiti connected — episodes will get automatic entity extraction")
+        else:
+            print("⚠️  Graphiti unavailable — falling back to manual Section nodes")
+    except Exception as e:
+        print(f"⚠️  Graphiti init failed ({e}) — falling back to manual Section nodes")
 
     # Ensure Qdrant collection exists
     collections = [c.name for c in qdrant.get_collections().collections]
@@ -367,12 +382,18 @@ async def seed_sections(
 
     # ── Phase D: Store ──
     print("💾 Phase D: Storing...")
-    phase_store(all_sections, stats, qdrant, neo4j_driver)
+    await phase_store(all_sections, stats, qdrant, neo4j_driver, graphiti)
     print(f"  Qdrant: {stats.sections_embedded} points → {SECTIONS_COLLECTION}")
-    print(f"  Neo4j: {stats.sections_total} Section nodes, {stats.entities_linked} entity links\n")
+    graphiti_status = f", {stats.entities_linked} Graphiti episodes" if graphiti else f", {stats.entities_linked} entity links"
+    print(f"  Neo4j: {stats.sections_total} sections{graphiti_status}\n")
 
     stats.duration_seconds = time.monotonic() - start
     neo4j_driver.close()
+    if graphiti:
+        try:
+            await graphiti.close()
+        except Exception:
+            pass
 
     # ── Summary ──
     print(f"✅ Done in {stats.duration_seconds:.1f}s")
