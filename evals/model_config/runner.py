@@ -59,6 +59,19 @@ async def run_single_case(
         token_count=case["section"]["token_count"],
     )
 
+    # Langfuse: create a trace for this eval case
+    langfuse = get_langfuse()
+    trace = None
+    if langfuse:
+        try:
+            trace = langfuse.start_observation(
+                name=f"model-eval-{config['name']}",
+                input=case["section"]["raw_text"][:500],
+                metadata={"config": config["name"], "case_id": case["id"], "model": config["model"]},
+            )
+        except Exception:
+            pass
+
     start = time.monotonic()
     try:
         summary = await summarize_section(
@@ -80,19 +93,17 @@ async def run_single_case(
             llm_grading=bool(os.environ.get("ANTHROPIC_API_KEY")),
         )
 
-        # Langfuse: post scores
-        langfuse = get_langfuse()
-        if langfuse:
+        # Langfuse: update trace with output + post scores
+        if trace:
             try:
+                trace.update(output=summary[:500], metadata={"duration_ms": duration_ms, "scores": scores})
+                trace.end()
+                # Post scores with trace_id
                 for score_name, score_val in scores.items():
                     if isinstance(score_val, (int, float)) and 0 <= score_val <= 1:
-                        langfuse.create_score(
-                            name=score_name,
-                            value=score_val,
-                            comment=f"config={config['name']}",
-                        )
-            except Exception:
-                pass
+                        trace.score(name=score_name, value=score_val, comment=config["name"])
+            except Exception as e:
+                logger.debug("Langfuse score post failed: %s", e)
 
         return {
             "case_id": case["id"],
@@ -106,6 +117,12 @@ async def run_single_case(
     except Exception as e:
         duration_ms = int((time.monotonic() - start) * 1000)
         logger.error("Error on %s with %s: %s", case["id"], config["name"], e)
+        if trace:
+            try:
+                trace.update(level="ERROR", status_message=str(e))
+                trace.end()
+            except Exception:
+                pass
         return {
             "case_id": case["id"],
             "config": config["name"],
