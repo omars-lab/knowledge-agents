@@ -272,17 +272,20 @@ Last updated: 2026-03-23. See `docs/MODEL_DECISIONS.md` for full decision log wi
 | Role | Model | Size | Key Metric |
 |------|-------|------|-----------|
 | **Embedding** | `text-embedding-qwen3-embedding-8b` | 4.68 GB | MTEB #1 (70.58) |
-| **Summarization** | `Qwen3.5-35B-A3B` (MoE) | ~20 GB | MMLU-Pro 85.3, 3B active |
+| **Summarization** | `Qwen3.5-9B` (dense) | 6.55 GB | Eval score 0.71, 100% non-empty |
 
 **Other installed models:**
 
 | Model | Size | Type | Notes |
 |-------|------|------|-------|
+| `Qwen3.5-35B-A3B` | 22.07 GB | Chat (MoE) | Previous summarization model (eval: 0.64, 90% non-empty) |
 | `text-embedding-nomic-embed-text-v1.5` | 84 MB | Embedding | Backup, 768 dims |
-| `ministral-3-14b-reasoning` | 9.12 GB | Chat | Previous summarization model |
+| `ministral-3-14b-reasoning` | 9.12 GB | Chat | Outdated generation |
 | `openai/gpt-oss-20b` | 12.10 GB | Chat | General |
 | `qwen/qwen3-coder-30b` | 17.19 GB | Code | MoE, fast inference |
 | `mistralai/devstral-small-2-2512` | 14.12 GB | Code | Coding-focused |
+
+**Last eval sweep:** 2026-03-24 — 50 runs (5 configs × 10 sections), 180 Langfuse scores. See `docs/MODEL_DECISIONS.md`.
 
 **Hardware:** M3 Ultra, 96 GB unified memory
 

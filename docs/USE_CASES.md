@@ -79,3 +79,16 @@ A living catalog mapping each feature to its implementing code, tests, and evals
 - Summarizer instrumentation: `src/knowledge_agents/services/summarizer.py`
 **Stack**: Langfuse v3 + ClickHouse + Redis + MinIO (shares existing Postgres)
 **Docs**: `docs/OBSERVABILITY.md`
+
+## UC-8: Model Configuration Evals (NEW)
+
+**What**: A/B compare LM Studio model configs (temperature, thinking mode, model size) for summarization quality, with scores posted to Langfuse
+**Commands**: `make model-eval`, `make model-eval-config CONFIG="9b"`, `make model-eval-report`
+**Code**:
+- Runner: `evals/model_config/runner.py` (config sweep, calls summarizer directly)
+- Scorer: `evals/model_config/scorer.py` (conciseness, non-empty, ROUGE-L, LLM grading)
+- Configs: `evals/model_config/configs.py` (5 configs: temperature sweep + thinking + model comparison)
+- Dataset: `evals/model_config/datasets/summarization.json` (10 real note sections from Neo4j)
+**Results**: Scores in Langfuse (180+ scores), JSON in `evals/model_config/results/`, markdown report
+**Outcome**: Qwen3.5-9B selected over 35B-A3B (0.71 vs 0.64 overall, 100% vs 90% non-empty)
+**Docs**: `docs/MODEL_DECISIONS.md`

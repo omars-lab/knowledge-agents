@@ -85,6 +85,11 @@ make lm-studio-test-embedding   # Test embedding pipeline
 make langfuse-up            # Start Langfuse + ClickHouse + Redis + MinIO
 make langfuse-down          # Stop all Langfuse services
 make langfuse-open          # Open Langfuse UI
+
+# Model config evals (compare summarization models/settings)
+make model-eval             # Run full config sweep (all configs × all test cases)
+make model-eval-config CONFIG="9b"  # Run specific config
+make model-eval-report      # Generate comparison report from latest results
 ```
 
 ### Claude Code Skills
