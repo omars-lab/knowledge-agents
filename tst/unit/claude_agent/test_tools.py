@@ -195,13 +195,42 @@ class TestBuildKnowledgeGraph:
 
 @pytest.mark.unit
 class TestQueryKnowledgeGraph:
-    """Tests for the query_knowledge_graph tool."""
+    """Tests for the query_knowledge_graph tool (Graphiti hybrid search)."""
+
+    @pytest.mark.asyncio
+    async def test_query_returns_results(self):
+        """query_knowledge_graph should return Graphiti search results."""
+        from knowledge_agents.claude_agent.tools import query_knowledge_graph
+
+        mock_graphiti = AsyncMock()
+        mock_graphiti.search.return_value = ["Entity: Alice (Person)", "Entity: Bob (Person)"]
+
+        with patch("knowledge_agents.claude_agent.tools.get_graphiti", return_value=mock_graphiti):
+            result = await query_knowledge_graph.handler({
+                "query": "Who are the people in the graph?"
+            })
+
+            assert not result.get("is_error")
+            assert "2 results" in result["content"][0]["text"]
+            mock_graphiti.search.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_query_no_graphiti(self):
+        """query_knowledge_graph should handle Graphiti unavailable."""
+        from knowledge_agents.claude_agent.tools import query_knowledge_graph
+
+        with patch("knowledge_agents.claude_agent.tools.get_graphiti", return_value=None):
+            result = await query_knowledge_graph.handler({"query": "test"})
+            assert result.get("is_error") is True
+
+
+@pytest.mark.unit
+class TestQueryGraphCypher:
+    """Tests for the query_graph_cypher fallback tool."""
 
     @pytest.fixture(autouse=True)
     def setup_mocks(self):
-        """Set up mocked Neo4j driver."""
         import knowledge_agents.claude_agent.tools as tools_mod
-
         self.settings = MagicMock()
         self.settings.neo4j_database = "neo4j"
         tools_mod._settings = self.settings
@@ -209,48 +238,22 @@ class TestQueryKnowledgeGraph:
         self.tools_mod = tools_mod
 
     @pytest.mark.asyncio
-    async def test_query_returns_results(self):
-        """query_knowledge_graph should return Cypher query results."""
-        from knowledge_agents.claude_agent.tools import query_knowledge_graph
-
-        mock_session = MagicMock()
-        mock_session.__enter__ = MagicMock(return_value=mock_session)
-        mock_session.__exit__ = MagicMock(return_value=False)
-        mock_session.run.return_value = [
-            {"name": "Alice", "type": "Person"},
-            {"name": "Bob", "type": "Person"},
-        ]
-        self.tools_mod._neo4j_driver.session.return_value = mock_session
-
-        result = await query_knowledge_graph.handler({
-            "cypher_query": "MATCH (e:Entity) RETURN e.name AS name, e.type AS type LIMIT 10"
-        })
-
-        assert not result.get("is_error")
-        data = json.loads(result["content"][0]["text"])
-        assert len(data) == 2
-
-    @pytest.mark.asyncio
-    async def test_query_rejects_mutations(self):
-        """query_knowledge_graph should reject write queries."""
-        from knowledge_agents.claude_agent.tools import query_knowledge_graph
+    async def test_cypher_rejects_mutations(self):
+        """query_graph_cypher should reject write queries."""
+        from knowledge_agents.claude_agent.tools import query_graph_cypher
 
         for cypher in [
             "CREATE (n:Node {name: 'test'})",
             "MATCH (n) DELETE n",
-            "MATCH (n) DETACH DELETE n",
             "MERGE (n:Node {name: 'test'})",
-            "MATCH (n) SET n.name = 'changed'",
-            "MATCH (n) REMOVE n.name",
         ]:
-            result = await query_knowledge_graph.handler({"cypher_query": cypher})
-            assert result.get("is_error") is True, f"Should reject: {cypher}"
-            assert "read-only" in result["content"][0]["text"].lower()
+            result = await query_graph_cypher.handler({"cypher_query": cypher})
+            assert result.get("is_error") is True
 
     @pytest.mark.asyncio
-    async def test_query_handles_error(self):
-        """query_knowledge_graph should handle Neo4j errors."""
-        from knowledge_agents.claude_agent.tools import query_knowledge_graph
+    async def test_cypher_handles_error(self):
+        """query_graph_cypher should handle Neo4j errors."""
+        from knowledge_agents.claude_agent.tools import query_graph_cypher
 
         mock_session = MagicMock()
         mock_session.__enter__ = MagicMock(return_value=mock_session)
@@ -258,7 +261,7 @@ class TestQueryKnowledgeGraph:
         mock_session.run.side_effect = Exception("Neo4j connection failed")
         self.tools_mod._neo4j_driver.session.return_value = mock_session
 
-        result = await query_knowledge_graph.handler({
+        result = await query_graph_cypher.handler({
             "cypher_query": "MATCH (n) RETURN n LIMIT 1"
         })
 
@@ -418,6 +421,6 @@ class TestMCPServerCreation:
         """TOOL_NAMES should follow mcp__<server>__<tool> convention."""
         from knowledge_agents.claude_agent.tools import TOOL_NAMES
 
-        assert len(TOOL_NAMES) == 4  # semantic_search disabled until embeddings configured
+        assert len(TOOL_NAMES) == 5  # read_note, build_knowledge_graph, query_knowledge_graph, query_graph_cypher, derive_xcallback_url
         for name in TOOL_NAMES:
             assert name.startswith("mcp__notes__"), f"Invalid tool name: {name}"

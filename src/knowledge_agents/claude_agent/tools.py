@@ -320,38 +320,94 @@ async def build_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
 @tool(
     name="query_knowledge_graph",
     description=(
-        "Execute a read-only Cypher query against the Neo4j knowledge graph. "
-        "Use this to explore entities, relationships, and patterns. "
-        "The graph has :Note and :Entity nodes, with :CONTAINS relationships "
-        "from notes to entities, and typed relationships between entities "
-        "(RELATED_TO, WORKS_ON, MENTIONS, REFERENCES, etc.)."
+        "Search the temporal knowledge graph using Graphiti's hybrid search "
+        "(semantic + keyword + graph traversal). Returns entities, relationships, "
+        "and facts with temporal validity. Use natural language queries — "
+        "Graphiti handles the search strategy automatically."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Natural language search query (e.g., 'What tools does Omar use?')",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum results to return (default 10)",
+                "minimum": 1,
+                "maximum": 50,
+            },
+        },
+        "required": ["query"],
+    },
+)
+async def query_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
+    """Search the knowledge graph via Graphiti hybrid search."""
+    search_query = args["query"]
+    limit = args.get("limit", 10)
+
+    try:
+        graphiti = await get_graphiti()
+        if not graphiti:
+            return {
+                "content": [{"type": "text", "text": "Graphiti is not available. Check LM Studio status."}],
+                "is_error": True,
+            }
+
+        results = await graphiti.search(
+            search_query,
+            group_ids=[GRAPHITI_GROUP],
+            num_results=limit,
+        )
+
+        if not results:
+            return {"content": [{"type": "text", "text": f"No results found for: {search_query}"}]}
+
+        # Format results for the agent
+        formatted = []
+        for r in results:
+            formatted.append(str(r))
+
+        text = f"Found {len(results)} results:\n\n" + "\n\n".join(formatted)
+        logger.info("query_knowledge_graph returned %d results for: %s", len(results), search_query[:60])
+        return {"content": [{"type": "text", "text": text}]}
+
+    except Exception as e:
+        logger.error("query_knowledge_graph error: %s", e, exc_info=True)
+        return {
+            "content": [{"type": "text", "text": f"Error searching graph: {e}"}],
+            "is_error": True,
+        }
+
+
+@tool(
+    name="query_graph_cypher",
+    description=(
+        "Execute a raw Cypher query against Neo4j (advanced). "
+        "Use query_knowledge_graph for most searches — this is for "
+        "when you need specific Cypher patterns. Read-only queries only."
     ),
     input_schema={
         "type": "object",
         "properties": {
             "cypher_query": {
                 "type": "string",
-                "description": "A Cypher query to execute (read-only)",
+                "description": "A read-only Cypher query (MATCH/RETURN only)",
             },
         },
         "required": ["cypher_query"],
     },
 )
-async def query_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
-    """Execute a Cypher query against Neo4j."""
+async def query_graph_cypher(args: dict[str, Any]) -> dict[str, Any]:
+    """Execute a raw Cypher query against Neo4j (fallback for advanced queries)."""
     cypher_query = args["cypher_query"]
 
-    # Basic safety check: reject mutations
     query_upper = cypher_query.strip().upper()
     forbidden = ["CREATE", "MERGE", "DELETE", "DETACH", "SET ", "REMOVE"]
     if any(kw in query_upper for kw in forbidden):
         return {
-            "content": [
-                {
-                    "type": "text",
-                    "text": "Error: Only read-only queries are allowed. Use MATCH/RETURN.",
-                }
-            ],
+            "content": [{"type": "text", "text": "Error: Only read-only queries allowed."}],
             "is_error": True,
         }
 
@@ -362,19 +418,14 @@ async def query_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
                 return [dict(record) for record in result]
 
         records = await asyncio.to_thread(_run_query)
-
         text = json.dumps(records, indent=2, default=str)
-        logger.info(
-            "query_knowledge_graph returned %d records for: %s",
-            len(records),
-            cypher_query[:80],
-        )
+        logger.info("query_graph_cypher returned %d records", len(records))
         return {"content": [{"type": "text", "text": text}]}
 
     except Exception as e:
-        logger.error("query_knowledge_graph error: %s", e, exc_info=True)
+        logger.error("query_graph_cypher error: %s", e, exc_info=True)
         return {
-            "content": [{"type": "text", "text": f"Error executing query: {e}"}],
+            "content": [{"type": "text", "text": f"Error: {e}"}],
             "is_error": True,
         }
 
@@ -446,6 +497,7 @@ ALL_TOOLS = [
     read_note,
     build_knowledge_graph,
     query_knowledge_graph,
+    query_graph_cypher,
     derive_xcallback_url,
 ]
 
@@ -453,6 +505,7 @@ TOOL_NAMES = [
     "mcp__notes__read_note",
     "mcp__notes__build_knowledge_graph",
     "mcp__notes__query_knowledge_graph",
+    "mcp__notes__query_graph_cypher",
     "mcp__notes__derive_xcallback_url",
 ]
 

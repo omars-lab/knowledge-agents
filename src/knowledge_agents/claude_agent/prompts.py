@@ -26,12 +26,17 @@ extracts entities, relationships, and temporal facts
 - Call this after reading a note to add its knowledge to the graph
 
 ### query_knowledge_graph
-Execute read-only Cypher queries against the Neo4j graph.
-- Use to explore entities, find patterns, and traverse relationships
-- The graph has :Note and :Entity nodes
-- :CONTAINS relationships connect notes to entities
-- Various relationship types connect entities to each other
-- Only MATCH/RETURN queries allowed (read-only)
+Search the temporal knowledge graph using natural language.
+- Uses Graphiti's hybrid search: semantic similarity + keyword matching + graph traversal
+- Returns entities, relationships, and facts with temporal information
+- Just ask a question — the search strategy is automatic
+- Example: "What tools does Omar use?" or "What projects are related to AI?"
+
+### query_graph_cypher
+Execute raw Cypher queries against Neo4j (advanced fallback).
+- Only use when you need specific Cypher patterns that natural language search can't handle
+- Read-only: only MATCH/RETURN queries allowed
+- The graph has :Entity and :Episodic nodes with :RELATES_TO and :MENTIONS edges
 
 ### derive_xcallback_url
 Generate a NotePlan app link for a note file.
