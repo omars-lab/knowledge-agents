@@ -185,6 +185,66 @@ ssh mac-studio "'/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms
 
 **Common quantization suffixes:** `@q4_k_m` (default), `@q5_k_m`, `@q8_0`, `@q3_k_m`
 
+### Configuration (IMPORTANT — do this after loading)
+
+After loading a model, configure it for your task. Key settings:
+
+#### Thinking / Reasoning Mode
+
+Qwen3 and Qwen3.5 models have built-in reasoning ("thinking") that runs before content output. This uses ~800-1000 extra tokens per response.
+
+| Setting | When | How |
+|---------|------|-----|
+| **Thinking ON** | Complex reasoning, math, code analysis | Default behavior (no config needed) |
+| **Thinking OFF** | Batch summarization, simple Q&A, fast responses | See below |
+
+**To disable thinking via API** (for batch summarization):
+\`\`\`python
+# Call LM Studio DIRECTLY (not through LiteLLM — it strips this param)
+response = await client.chat.completions.create(
+    model="qwen3.5-35b-a3b",
+    max_tokens=2000,  # MUST be high — model uses ~900 tokens reasoning overhead
+    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+    messages=[...],
+)
+\`\`\`
+
+**To disable thinking via LM Studio GUI:**
+1. Go to My Models → select model → Inference sidebar
+2. Scroll to Prompt Template (Jinja)
+3. Add `{%- set enable_thinking = false %}` as the first line
+4. Reload model
+
+**WARNING:** Even with `enable_thinking=false`, Qwen3.5 still uses ~900 tokens of internal reasoning. Set `max_tokens=2000+` for summarization (actual summary is ~50-100 tokens).
+
+#### Load Options (CLI)
+
+\`\`\`bash
+# Context length (default: model max, reduce to save RAM)
+lms load --yes 'model-name' --context-length 8192
+
+# Parallel inference (concurrent requests, reduces per-request speed)
+lms load --yes 'model-name' --parallel 4
+
+# GPU offload (Apple Silicon: usually auto, 'max' for full GPU)
+lms load --yes 'model-name' --gpu max
+
+# TTL (auto-unload after N seconds of inactivity)
+lms load --yes 'model-name' --ttl 3600
+
+# Estimate RAM before loading
+lms load --yes 'model-name' --estimate-only
+\`\`\`
+
+#### Sampling Parameters by Task
+
+| Task | Temperature | Top-P | Max Tokens | Notes |
+|------|-------------|-------|------------|-------|
+| Summarization | 0.3-0.5 | 0.9 | 2000 | Low temp for factual, consistent summaries |
+| Entity extraction | 0.1-0.3 | 0.9 | 1000 | Very low temp for structured JSON output |
+| General chat | 0.7-0.9 | 0.95 | 4000 | Higher temp for creative, varied responses |
+| Code generation | 0.2-0.4 | 0.95 | 4000 | Low temp for correct code |
+
 ### Files to Update (MANDATORY after model change)
 After changing a model, update ALL of these:
 \`\`\`
