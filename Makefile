@@ -662,6 +662,15 @@ observability-down: ## Stop observability stack
 grafana-open: ## Open Grafana dashboard in browser
 	@open http://localhost:3001 2>/dev/null || echo "Open: http://localhost:3001"
 
+model-eval: ## Run model config eval sweep (all configs × all test cases)
+	@conda run -n $(conda-env-name) python -m evals.model_config.runner --delay 2
+
+model-eval-config: ## Run eval for a specific config (usage: make model-eval-config CONFIG="35b-a3b-t0.5")
+	@conda run -n $(conda-env-name) python -m evals.model_config.runner --config "$(CONFIG)" --delay 2
+
+model-eval-report: ## Generate comparison report from latest eval results
+	@conda run -n $(conda-env-name) python -m evals.model_config.report
+
 langfuse-up: ## Start Langfuse v3 LLM observability (ClickHouse + Redis + Minio + Worker + Web)
 	@echo "🔍 Starting Langfuse v3 stack..."
 	@docker compose up -d langfuse-clickhouse langfuse-redis langfuse-minio langfuse-create-bucket langfuse-worker langfuse

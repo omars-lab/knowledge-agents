@@ -1,194 +1,242 @@
-# Langfuse Migration: LLM Observability + Stack Simplification
+# Model Configuration Evals: Find Ideal Summarization Settings
 
 ## Context
 
-We have a custom eval framework (runner + scorer + JSON results), hand-built session workspaces (JSON files per turn), 6 Prometheus LLM counters, and LLM-grading via Haiku. This works but is fragile, file-based, and lacks visualization for multi-turn traces.
+We have Qwen3.5-35B-A3B loaded on the Mac Studio for summarization, but we don't know the ideal configuration. The model has thinking mode overhead (~900 tokens), and we haven't tested different temperatures, quantizations, or whether Qwen3.5-9B (also downloaded) might be better. We need a systematic A/B framework to compare configs.
 
-**Current OTel/metrics state (broken):**
-- Claude Agent `/metrics` — defined in code but not serving after latest rebuild
-- Agentic API `/metrics` — only emitting Kong gateway metrics, not app-level LLM metrics
-- **No OTel traces anywhere** — no spans, no trace context propagation
-- No tracing of LLM calls (input/output/tokens/cost per call)
+**What we want to find:**
+- Thinking ON vs OFF: does thinking improve summary quality enough to justify 5x token cost?
+- Temperature 0.3 vs 0.5 vs 0.7: which produces the best summaries for personal notes?
+- Qwen3.5-35B-A3B vs Qwen3.5-9B: is the bigger model worth the extra RAM/speed cost?
+- What `max_tokens` is actually needed per config?
 
-Langfuse (self-hosted) replaces most of this with a proper LLM observability platform: trace visualization, prompt versioning, eval scoring, cost tracking — all with a web UI. By migrating, we can **remove** session workspace files, LLM-specific Prometheus metrics, and custom eval grading, while **keeping** Loki (logs) and Prometheus (infra health only).
-
-## What Changes
-
-| Component | Before | After | Action |
-|-----------|--------|-------|--------|
-| Session workspaces (`build/sessions/`) | JSON files per turn | Langfuse traces | **Remove** `_write_session_metadata`, `_write_turn_artifacts` |
-| LLM Prometheus metrics (6 counters) | `claude_agent_*` in server.py | Langfuse dashboard | **Remove** from server.py |
-| Eval LLM grading (Haiku) | Custom scorer.py | Langfuse eval datasets + scoring | **Migrate** |
-| Eval results JSON | `evals/results/*.json` | Langfuse eval runs | **Migrate** runner to post results to Langfuse |
-| Grafana LLM dashboards | Custom panels | Langfuse UI | **Simplify** Grafana to infra-only |
-| Loki (logs) | Container log aggregation | Same | **Keep** |
-| Prometheus (infra) | Container health, uptime | Same (remove LLM counters) | **Keep** (simplified) |
+**What exists:**
+- `evals/model_config/` directory (created, empty except `__init__.py`)
+- 857 Section nodes in Neo4j with `raw_text` and `token_count` (real note content)
+- Langfuse tracing for per-call cost/latency/token tracking
+- Existing eval pattern (`evals/claude_agent/runner.py` + `scorer.py`) to reuse
+- Summarizer at `src/knowledge_agents/services/summarizer.py` (needs temperature/thinking params exposed)
 
 ## Plan
 
-### Step 1: Add Langfuse to Docker Compose
-
-Add 2 services (Langfuse v3 uses single container + existing Postgres):
-
-```yaml
-langfuse:
-  image: langfuse/langfuse:latest
-  ports:
-    - "3210:3000"
-  environment:
-    - DATABASE_URL=postgresql://knowledge:knowledge123@postgres:5432/langfuse
-    - NEXTAUTH_SECRET=langfuse-secret-change-me
-    - NEXTAUTH_URL=http://localhost:3210
-    - SALT=langfuse-salt-change-me
-    - LANGFUSE_INIT_ORG_ID=knowledge-agents
-    - LANGFUSE_INIT_ORG_NAME=Knowledge Agents
-    - LANGFUSE_INIT_PROJECT_ID=knowledge-agents
-    - LANGFUSE_INIT_PROJECT_NAME=Knowledge Agents
-    - LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-knowledge
-    - LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-knowledge
-    - LANGFUSE_INIT_USER_EMAIL=admin@local
-    - LANGFUSE_INIT_USER_PASSWORD=knowledge123
-  depends_on:
-    postgres:
-      condition: service_healthy
-  healthcheck:
-    test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/public/health || exit 1"]
-    interval: 15s
-    timeout: 10s
-    retries: 5
-    start_period: 30s
-  restart: unless-stopped
-```
-
-Create `langfuse` database in Postgres init script or startup.
-
-### Step 2: Create Langfuse tracing utility
-
-**New file:** `src/knowledge_agents/utils/langfuse_trace.py`
-
-Thin wrapper around the Langfuse Python SDK:
-```python
-from langfuse import Langfuse
-
-_client: Langfuse | None = None
-
-def get_langfuse() -> Langfuse | None:
-    """Lazy-init Langfuse client. Returns None if not configured (graceful degradation)."""
-
-def trace_llm_call(name, input, output, model, usage, metadata, parent_trace_id=None):
-    """Record an LLM call as a Langfuse generation span."""
-
-def trace_tool_call(name, input, output, parent_trace_id):
-    """Record a tool invocation as a Langfuse span."""
-```
-
-Key design: **graceful degradation** — if Langfuse is down or not configured, all trace functions are no-ops. App continues working.
-
-Config via env vars:
-```
-LANGFUSE_PUBLIC_KEY=pk-lf-knowledge
-LANGFUSE_SECRET_KEY=sk-lf-knowledge
-LANGFUSE_HOST=http://langfuse:3000
-```
-
-### Step 3: Instrument Claude Agent (Priority 1)
-
-**File:** `src/knowledge_agents/claude_agent/agent.py`
-
-In `stream_agent_response()`:
-- Create a Langfuse trace at start (`trace = langfuse.trace(name="chat", input=message, session_id=session_id)`)
-- Log each tool call as a span (`trace.span(name=tool_name, input=tool_input)`)
-- On ResultMessage: update trace with output, cost, duration
-- On error: update trace with error status
-
-**Remove:** `_write_session_metadata()`, `_write_turn_artifacts()`, `_ensure_session_workspace()` — Langfuse replaces all of these.
-
-**File:** `src/knowledge_agents/claude_agent/server.py`
-
-Remove LLM-specific Prometheus metrics:
-- Remove `CHAT_REQUESTS`, `CHAT_DURATION`, `TOOL_CALLS`, `RATE_LIMIT_EVENTS`, `COST_TOTAL`, `STREAM_REQUESTS`
-- Keep `/health` and `/metrics` endpoints (Prometheus still serves infra health)
-- Keep request-level logging (Loki)
-
-### Step 4: Instrument Summarizer (Priority 2)
+### Step 1: Refactor summarizer to accept configurable params
 
 **File:** `src/knowledge_agents/services/summarizer.py`
 
-In `summarize_sections_batch()`:
-- Create parent trace: `trace = langfuse.trace(name="summarize_batch", metadata={"section_count": len(sections)})`
-- Each `summarize_section()` call: `trace.generation(name="summarize_section", input=text, output=summary, model=model, usage={...})`
+Add `temperature` and `enable_thinking` parameters to `summarize_section()`:
+```python
+async def summarize_section(
+    section, client, model=DEFAULT_MODEL,
+    max_summary_tokens=DEFAULT_MAX_SUMMARY_TOKENS,
+    temperature=0.5,
+    enable_thinking=False,
+) -> str:
+```
 
-### Step 5: Instrument Embedding + Seed Pipeline (Priority 3)
+Pass them to the OpenAI call:
+```python
+response = await client.chat.completions.create(
+    model=model,
+    max_tokens=max_summary_tokens,
+    temperature=temperature,
+    extra_body={"chat_template_kwargs": {"enable_thinking": enable_thinking}},
+    ...
+)
+```
 
-**File:** `scripts/seed_sections.py`
+### Step 2: Create test dataset from real sections
 
-In `phase_embed()`:
-- Trace each embedding batch as a Langfuse generation
-- Track model, batch size, token count
+**File:** `evals/model_config/datasets/summarization.json`
 
-In `phase_summarize()`:
-- Already instrumented via summarizer (Step 4)
+Pull 15-20 diverse sections from Neo4j (varying token counts, heading types, content types). Include synthetic "gold" reference summaries generated by Claude as a quality baseline.
 
-### Step 6: Migrate Eval Framework to Langfuse
+Structure:
+```json
+{
+  "test_cases": [
+    {
+      "id": "sum-001",
+      "section": {
+        "heading": "Moving Faster",
+        "heading_path": "Moving Faster",
+        "raw_text": "* Tokens / Claude Access\n* API Key?...",
+        "token_count": 250
+      },
+      "gold_summary": "Discussion of resources needed to accelerate AI development...",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences without unnecessary detail?",
+        "faithfulness": "Does it only state things present in the source?"
+      }
+    }
+  ]
+}
+```
 
-**File:** `evals/claude_agent/runner.py`
+### Step 3: Create config matrix
 
-Instead of saving JSON results to `evals/results/`:
-- Create a Langfuse dataset for each eval dataset (note_search, graph_building, etc.)
-- Each test case becomes a dataset item
-- Runner posts results as Langfuse scores on traces
-- `--llm-grading` uses Langfuse's built-in annotation scoring
+**File:** `evals/model_config/configs.py`
 
-**File:** `evals/claude_agent/scorer.py`
+Define the configurations to sweep:
+```python
+CONFIGS = [
+    # Baseline (current production config)
+    {"name": "35b-a3b-t0.5-nothink", "model": "qwen3.5-35b-a3b", "temperature": 0.5, "enable_thinking": False, "max_tokens": 2000},
+    # Temperature sweep
+    {"name": "35b-a3b-t0.3-nothink", "model": "qwen3.5-35b-a3b", "temperature": 0.3, "enable_thinking": False, "max_tokens": 2000},
+    {"name": "35b-a3b-t0.7-nothink", "model": "qwen3.5-35b-a3b", "temperature": 0.7, "enable_thinking": False, "max_tokens": 2000},
+    # Thinking mode comparison
+    {"name": "35b-a3b-t0.5-think", "model": "qwen3.5-35b-a3b", "temperature": 0.5, "enable_thinking": True, "max_tokens": 4000},
+    # Model comparison (requires loading 9B)
+    {"name": "9b-t0.5-nothink", "model": "qwen3.5-9b", "temperature": 0.5, "enable_thinking": False, "max_tokens": 2000},
+]
+```
 
-- Remove `_llm_grade_quality()` and `_llm_grade_context_retention()` — use Langfuse eval functions instead
-- Keep code-based scoring (tool_selection, output_contains) — post as Langfuse scores
+### Step 4: Create eval runner
 
-### Step 7: Simplify Grafana
+**File:** `evals/model_config/runner.py`
 
-Remove LLM-specific dashboard panels. Keep:
-- Container health (Docker stats)
-- Neo4j/Qdrant/Postgres connection status
-- Log volume (Loki)
+Follows the `evals/claude_agent/runner.py` pattern but calls the summarizer directly instead of the chat API:
 
-LLM dashboards move to Langfuse UI at `http://localhost:3210`.
+```python
+async def run_config_eval(dataset, config, langfuse_trace=True):
+    """Run all test cases with a specific model config."""
+    client = AsyncOpenAI(base_url=LM_STUDIO_URL, api_key="lm-studio")
+    results = []
+    for case in dataset["test_cases"]:
+        section = SectionData(**case["section"])
+        start = time.monotonic()
+        summary = await summarize_section(
+            section, client,
+            model=config["model"],
+            temperature=config["temperature"],
+            enable_thinking=config["enable_thinking"],
+            max_summary_tokens=config["max_tokens"],
+        )
+        duration_ms = int((time.monotonic() - start) * 1000)
+        results.append({
+            "case_id": case["id"],
+            "config": config["name"],
+            "summary": summary,
+            "duration_ms": duration_ms,
+            "summary_tokens": len(summary.split()),  # rough estimate
+        })
+    return results
+```
 
-### Step 8: Update docs
+CLI:
+```bash
+python -m evals.model_config.runner --dataset summarization [--llm-grading] [--delay 1]
+```
 
-- `docs/OBSERVABILITY.md` — add Langfuse section, update architecture diagram
-- `CLAUDE.md` — add Langfuse to Living Documents, update Key Commands
-- `docs/TECH_DESIGN.md` — update observability section
-- `README.md` — add Langfuse to tech stack
+Runs each config × each test case, saves results as timestamped JSON.
 
-### Step 9: Makefile targets
+### Step 5: Create eval scorer
+
+**File:** `evals/model_config/scorer.py`
+
+Score each summary on:
+
+| Dimension | Method | Score Range |
+|-----------|--------|------------|
+| **Completeness** | LLM grading (Haiku) | 0.0 - 1.0 |
+| **Conciseness** | Token ratio (summary / input) — lower is better | 0.0 - 1.0 |
+| **Faithfulness** | LLM grading (does it hallucinate?) | 0.0 - 1.0 |
+| **Gold similarity** | ROUGE-L or BERTScore vs gold summary | 0.0 - 1.0 |
+| **Latency** | Raw ms (lower is better) | raw value |
+| **Token cost** | Total tokens used (thinking overhead) | raw value |
+
+For gold similarity, use simple word overlap (no heavy ML dependencies):
+```python
+def rouge_l_score(candidate, reference):
+    """Simple ROUGE-L F1 using longest common subsequence."""
+```
+
+### Step 6: Create comparison report
+
+**File:** `evals/model_config/report.py`
+
+Generate a markdown comparison table:
+```
+## Model Config Eval Report
+
+| Config | Completeness | Conciseness | Faithfulness | Similarity | Avg Latency | Tokens |
+|--------|-------------|-------------|-------------|-----------|------------|--------|
+| 35b-t0.5-nothink | 0.85 | 0.90 | 0.95 | 0.78 | 1200ms | 950 |
+| 35b-t0.3-nothink | 0.82 | 0.92 | 0.97 | 0.80 | 1100ms | 920 |
+| 35b-t0.7-nothink | 0.88 | 0.85 | 0.90 | 0.75 | 1300ms | 980 |
+| 35b-t0.5-think   | 0.92 | 0.88 | 0.96 | 0.82 | 5500ms | 3200 |
+| 9b-t0.5-nothink  | 0.78 | 0.91 | 0.88 | 0.70 | 600ms  | 400 |
+
+Winner: [config with best quality/speed balance]
+```
+
+### Step 7: Makefile targets
 
 ```makefile
-langfuse-up:     ## Start Langfuse (requires: make docker-up for Postgres)
-langfuse-open:   ## Open Langfuse UI in browser
-langfuse-down:   ## Stop Langfuse
+model-eval:           ## Run model config eval sweep
+model-eval-report:    ## Generate comparison report from latest results
 ```
+
+### Step 8: Post scores to Langfuse
+
+Each eval result gets pushed to Langfuse as **scored traces**, enabling visual comparison in the Langfuse dashboard:
+
+1. **Each summarization call** creates a Langfuse generation trace (already wired)
+2. **After scoring**, the runner posts scores back to the trace via Langfuse SDK:
+```python
+langfuse = get_langfuse()
+# For each scored result:
+langfuse.score_current_trace(name="completeness", value=0.85, comment="LLM graded")
+langfuse.score_current_trace(name="conciseness", value=0.92, comment="token ratio")
+langfuse.score_current_trace(name="faithfulness", value=0.97, comment="LLM graded")
+langfuse.score_current_trace(name="gold_similarity", value=0.80, comment="ROUGE-L")
+```
+
+3. **Config metadata** is attached to each trace:
+```python
+trace.update(metadata={"config": config["name"], "eval_run": run_id})
+```
+
+4. **Langfuse dashboard** then shows:
+- Filter by config name → see all traces for that config
+- Compare score distributions across configs (completeness, conciseness, etc.)
+- Drill into individual traces to see input/output/summary side-by-side
+- Export scores as CSV for external analysis
+
+5. **Create Langfuse dataset** for reproducibility:
+```python
+# Create a dataset from the test cases
+dataset = langfuse.create_dataset(name="summarization-eval-v1")
+for case in test_cases:
+    langfuse.create_dataset_item(
+        dataset_name="summarization-eval-v1",
+        input=case["section"]["raw_text"],
+        expected_output=case["gold_summary"],
+        metadata=case["grading"],
+    )
+```
+
+This means: **all eval data lives in Langfuse**, not just local JSON files. The JSON results still saved locally as backup, but Langfuse is the primary analysis tool.
 
 ## Critical Files
 
 | File | Action |
 |------|--------|
-| `docker-compose.yml` | Add langfuse service, create langfuse DB |
-| `src/knowledge_agents/utils/langfuse_trace.py` | New: tracing utility |
-| `src/knowledge_agents/claude_agent/agent.py` | Add traces, remove session workspace writes |
-| `src/knowledge_agents/claude_agent/server.py` | Remove LLM Prometheus counters |
-| `src/knowledge_agents/services/summarizer.py` | Add trace generation spans |
-| `scripts/seed_sections.py` | Add batch tracing |
-| `evals/claude_agent/runner.py` | Post results to Langfuse |
-| `evals/claude_agent/scorer.py` | Remove LLM grading, post scores to Langfuse |
-| `requirements-claude-agent.txt` | Add `langfuse` package |
-| `docs/OBSERVABILITY.md` | Update architecture |
-| `Makefile` | Add langfuse targets |
+| `src/knowledge_agents/services/summarizer.py` | Add temperature + thinking params |
+| `evals/model_config/runner.py` | New: config sweep runner |
+| `evals/model_config/scorer.py` | New: summarization quality scorer |
+| `evals/model_config/report.py` | New: comparison report generator |
+| `evals/model_config/configs.py` | New: config matrix definition |
+| `evals/model_config/datasets/summarization.json` | New: test sections + gold summaries |
+| `Makefile` | Add model-eval targets |
 
 ## Verification
 
-1. `make langfuse-up` — Langfuse UI at http://localhost:3210
-2. `make claude-agent-chat MSG="hello"` — trace appears in Langfuse
-3. `make seed-sections-summarize` — batch traces appear with per-section generations
-4. `make claude-agent-eval` — eval results appear as Langfuse dataset scores
-5. Grafana still works for infra dashboards (no LLM panels)
-6. App works with Langfuse down (graceful degradation)
+1. Refactor test: `conda run -n knowledge-agents pytest tst/unit/claude_agent/ -q -m unit`
+2. Generate dataset: pull sections from Neo4j, generate gold summaries
+3. Run single config: `python -m evals.model_config.runner --config "35b-a3b-t0.5-nothink"`
+4. Run full sweep: `python -m evals.model_config.runner` (all configs × all cases)
+5. Generate report: `python -m evals.model_config.report`
+6. Check Langfuse: verify per-config traces appear with metadata
+7. Pick winner and update `docs/MODEL_DECISIONS.md`

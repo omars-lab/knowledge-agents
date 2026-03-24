@@ -1,0 +1,154 @@
+{
+  "test_cases": [
+    {
+      "id": "sum-001",
+      "section": {
+        "heading": "Apps",
+        "heading_path": "Apps",
+        "raw_text": "* [ ] [Rectangle](https://rectangleapp.com/)\n* [ ] Interesting white boarding tool\n------\nhttps://vscodium.com/#why\n------\nhttps://diffsense.com/\n------\nWhat does ncurses do ...\n------\n- https://www.npmjs.com/package/ts-mockito\n- When you mock something ... you need to implement all its attributes ...\n- When you spy ... you partially mock ..\n------\nSyncing Cross Package Deps\nhttps://facebook.github.io/watchman/docs/install.html\nhttps://github.com/wix/wml/issues/38\n---------  \n* Wiki Tools\n* https://www.mediawiki.org/wiki/Help:Extension:ParserFunctions\n* http://extensions.xwiki.org/xwiki/bin/login/XWiki/XWikiLogin?srid=W4NtOrTv&xredirect=%2Fxwiki%2Fbin%2Fview%2FExtension%2FCode%2BMacro%3Fsrid%3DW4NtOrTv  \n* Tools\n* https://kroki.io/\n* https://docs-as-co.de/news/mind-maps/\n* https://blog.mrhaki.com/search/label/PlantUML",
+        "token_count": 208
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    },
+    {
+      "id": "sum-002",
+      "section": {
+        "heading": "References",
+        "heading_path": "References",
+        "raw_text": "- https://ai.azure.com/management/hub/deployments?wsid=/subscriptions/7b717d06-8c12-4a8a-a817-acd40fa24b00/resourcegroups/rg-foundry-poc-eastus2-dev/providers/Microsoft.MachineLearningServices/workspaces/aih-foundry-poc-v2-dev&tid=8bcff170-9979-491e-8683-d8ced0850bad&deploymentTab=modelDeployments\n- https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/migrate-project?view=foundry-classic&tabs=azure-ai-foundry\n- https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/migrate-project?view=foundry-classic&tabs=azure-ai-foundry\n- https://ai.azure.com/managementCenter/project/overview?wsid=/subscriptions/7b717d06-8c12-4a8a-a817-acd40fa24b00/resourceGroups/rg-foundry-poc-eastus2-dev/providers/Microsoft.MachineLearningServices/workspaces/aip-foundry-poc-v2-dev&tid=8bcff170-9979-491e-8683-d8ced0850bad\n- https://ai.azure.com/management/hub/deployments?wsid=/subscriptions/7b717d06-8c12-4a8a-a817-acd40fa24b00/resourcegroups/rg-foundry-poc-eastus2-dev/providers/Microsoft.MachineLearningServices/workspaces/aih-foundry-poc-v2-dev&tid=8bcff170-9979-491e-8683-d8ced0850bad\n- johnnyreilly.com/azure-open-ai-capacity-quota-bicep",
+        "token_count": 284
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    },
+    {
+      "id": "sum-003",
+      "section": {
+        "heading": "🏢 260223 Sweep Workshop Day 2",
+        "heading_path": "🏢 260223 Sweep Workshop Day 2",
+        "raw_text": "* [ ] Are Action Items for [[🏢 260223 Sweep Workshop Day 1]] done? >2026-W09  \n* When you base everything on the metadata ... its most connected -\n* My questions\n* Did you reverse engineer the process?\n* Is this more than an MCP connected with saelsforce with promtps?\n* What are the guardrails? What if someone asks ... is it worth migrating ... ?\n* How do you do human in the loop?\n* * [Sweep MCP](https://www.sweep.io/sweep-model-context-protocol) vs [Salesforce MCP](https://developer.salesforce.com/blogs/2025/06/introducing-mcp-support-across-salesforce)\n* Beyond generating detailed report ... how is all this information synthesized, how do we expect to use each artfiact, etc ...\n* CPQ - its a clone of thier instance with data ...  \n* Is it an agent that determines all of this\n* They build their own graph with code ...\n* weh agaents have business questions the y can re-tiunertret the groaph\n* normalzied / rationalized view of an aexisting implementation\n* migration\n* Agent can hold more than 1 best practice\n* knowleedge base,ncan grow, etc\n* determinism / boomi has a team of admins\n* they have a normalized data model that all feed into  \n* Are there guardrails ...\n* More an internal tool\n* Guardrails - alot of what it can answer, cant answer ...  \n* artifacts to put together a high level plan\n* other artifacts for specific stories ...\n* \"Migration Planner\" ....\n* How do we use all this information",
+        "token_count": 356
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    },
+    {
+      "id": "sum-004",
+      "section": {
+        "heading": "Enterprise AI Applications",
+        "heading_path": "Claude.md > Enterprise AI Applications",
+        "raw_text": "- [ ] 📽️ [**How BlackRock Builds Custom Knowledge Apps at Scale** (YouTube, 2025-08-23)](https://youtu.be/08mH36_NVos)\n- Authors: Vaibhav Page & Infant Vasanth, BlackRock | Duration: 18 minutes\n- Summary: Modular, Kubernetes-native AI framework for scaling Knowledge Apps across enterprise. Covers document extraction, investment signals, and maintaining compliance in regulated industry.\n- Topics: #enterprise #blackrock #knowledgeapps  \n- [ ] 📖 [**Vibe Engineering Book**](https://www.manning.com/books/vibe-engineering)\n- Publisher: Manning\n- Summary: Recommended reading for GenAI development\n- Topics: #book #vibeengineering #genai",
+        "token_count": 160
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    },
+    {
+      "id": "sum-005",
+      "section": {
+        "heading": "Syntax Quick Lookup",
+        "heading_path": "🏢 260123 Understanding: ECMAScript, JS Modules, etc > Quick Reference > Syntax Quick Lookup",
+        "raw_text": "| Feature | ES5 | ES2021 |\n| ------- | --- | ------ |\n| Variables | `var x = 1` | `let x = 1; const y = 2` |\n| Functions | `function f() {}` | `const f = () => {}` |\n| Strings | `\"Hi \" + name` | `` `Hi ${name}` `` |\n| Objects | `{x: x}` | `{x}` |\n| Classes | `function F() {}` + prototype | `class F {}` |\n| Modules | `require`/`module.exports` | `import`/`export` |\n| Async | callbacks | `async`/`await` |\n| Defaults | `a |  |\n| Optional access | `a && a.b && a.b.c` | `a?.b?.c` |",
+        "token_count": 121
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    },
+    {
+      "id": "sum-006",
+      "section": {
+        "heading": "Agentic Approach",
+        "heading_path": "🏢260212🧑🏻💻 Developing Claude Artifact for Update Set Creation > Agentic Approach",
+        "raw_text": "- Do you have access to servicenow docs?\n- What key docs should all agents be aware of?\n- All Properties:\n- https://www.servicenow.com/docs/r/platform-administration/r_AvailableSystemProperties.html\n- Or do we search the web\n- https://mynow.servicenow.com/now/best-practices/home  \nExplain what needs to be done — table schemas / deps / etc.\nCatalog item - tough example:\n- Cat item table\n- Variable table\n- Multi variable\n- UI Policy\n- Client Script\n- User Criteria\n- All rels across all tables ...\n- View schema → make a Mermaid diagram\n- [next-ai-draw-io](https://github.com/DayuanJiang/next-ai-draw-io) (LLM supported)\n- vllm - load across servers  \n---",
+        "token_count": 165
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    },
+    {
+      "id": "sum-007",
+      "section": {
+        "heading": "Unsorted",
+        "heading_path": "Unsorted",
+        "raw_text": "- [ ] Request YubiKey >2026-03-20  \n- [ ] I should have my own cloud agent ... organizing my stuff in the \"cloud\" ...\n- [ ] using my own claude subscription\n- [ ] Building my own graph ...  \n- [ ] Profile of one ...\n- [ ] Calendar based like noteplan\n- [ ] Browser plugin - get data on what users saw, considered, bought, etc?\n- [ ] Where did users spend their time?\n- [ ] Sweep through the daily logs to start building hypothesis ...\n- [ ] As our understanding of user changes based on what we observe today, start spitting out events ...\n- [ ] Partition people int ogorups / sell them coupons ...  \n- [ ] For work\n- [ ] Extract core mesne of what TC is trying to do ...\n- [ ] Cache that?\n- [ ] This kind of change need to touch these tables, tc ...  \nhttps://github.com/anthropics/claude-plugins-official/tree/main/plugins/ralph-loop\nWhat background knowledge agents do I need?  \nhttps://rwilinski.ai/\nhttps://rwilinski.ai/consulting/\nhttps://github.com/RafalWilinski/mcp-apple-notes  \n- [ ] Apple notes scripts\n- [ ] https://github.com/LeetaoGoooo/apple-note-plugin/tree/main/.claude/skills/apple-note/scripts\n- [ ] How can we investigate an app and create a set of scripts to control the app ... via claude skills ...\n- [ ] i.e teach claude how to use the app ...  \n- [ ] Get MCP running on my local machine that I connect to claude code\n- [ ] ## Add custom connector\n- [ ] With ClientId and Oauth Client Secret ...\n- [ ] MCP can do Whatever I want ...",
+        "token_count": 365
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    },
+    {
+      "id": "sum-008",
+      "section": {
+        "heading": "🏢260121🖥️ Personal Automation Setup",
+        "heading_path": "🏢260121🖥️ Personal Automation Setup",
+        "raw_text": "- [x] Setup personal plugin for notemanagement in vscode >2026-01-21 @done(2026-01-21T18:09:54.368Z)\n- [x] >Get vscode working with claude code 2026-01-21 @done(2026-01-21T18:10:03.558Z)  \n* [ ] How will I import notes form phone ...\n* [ ] xcallback for one note?\n* [ ] powerauomtation?  \n* [ ] Make a plugin for vscode task management\n* [ ] Make a script for calendar\n* [ ] Make a scrript for notes  \n* [ ] I should have script that updates link titles / how they are summarized ...\n* [ ] Exmaples ... if its a surf link ... look at KB id ... get KB title name ... etc...\n* [ ] If google search ... take keyword ...\n* [ ] I should have script that skims throuhg front matter based on folder and analyzes it ...  \n- [ ] Setup script to manage notes, look for front matter metdata, etc ... >2026-01-21\n- [ ] Add the ability to have item do a popup / have commands like `/new-plan` that auto complete and ask me what sub filder, etc ... create the right metaadata, etc ...  >2026-01-21\n- [ ] What about doing this same stuff in the vs-code plugin ... after I make a file ... how do I get a shortcut to run with the new file we just made and run claude on it to clean it up ... ?>2026-01-21\n- [Company Culture](https://surf.service-now.com/ourstrategy?spa=1&tab=our_culture#our_culture)\n- [ ] If I multi select then do command l or shift l ... it should add on all lines and respefct indentaiotn l... >2026-01-21",
+        "token_count": 353
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    },
+    {
+      "id": "sum-009",
+      "section": {
+        "heading": "Quotes",
+        "heading_path": "Quotes",
+        "raw_text": "* [x] Connect to remote neo4j instance on my Mac studio ... @done(2025-11-30 02:02 PM)\n---\n| Swept | Section | Summary | Destination |\n|-------|---------|---------|-------------|\n| 2025-12-27 | # Personal Tips | Business/customer observations | [[🏡260313👨🏻💼 Planning Coffee Business]] |\n| 2025-12-27 | # Personal References | Matthew Johnson contact (bitrift.tech) | [[🏡📋 References[Personal]]] |\n| 2025-12-27 | # Meal Planning | Struggle meals article link | [[🏡📋 References[Personal]]] |\n| 2025-12-27 | # Quotes | \"If you have enough reasons...\" quote | [[🏡📋 Quotes]] |",
+        "token_count": 143
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    },
+    {
+      "id": "sum-010",
+      "section": {
+        "heading": "🏢 260129 SNL 2026",
+        "heading_path": "🏢 260129 SNL 2026",
+        "raw_text": "* [ ] Are Action Items for [[🏢 260129 SNL 2026]] done? >2026-W05  \n---  \nhttps://servicenow.seismic.com/apps/doccenter/3dcd2d1b-653a-4858-bd19-469e69f971cc/doc/%2Fddf2b75914-6886-68f8-a07f-d4127a0cecb9%2FdfYzQxNzhkMWYtMjViYS00N2VmLWFkMGItY2I0ZjVlODdlMzQz%2CPT0%3D%2CU2Vpc21pYyBQYWdl%2Flf70635cce-d8f9-42fc-be20-b7dacc95096b/?mode=view&searchId=94a1185b-6551-41cc-9e06-b8557add666e&anchorId=52daf02c-61ad-4df5-9bf8-67ae97c0ba9d\n---\nPepsi sees us as the knoweldge maangement platform ..\nThere were stuff on graphs, etc ...",
+        "token_count": 131
+      },
+      "gold_summary": "",
+      "grading": {
+        "completeness": "Does the summary capture the main topics?",
+        "conciseness": "Is it 1-2 sentences?",
+        "faithfulness": "Only mentions things in source?"
+      }
+    }
+  ]
+}

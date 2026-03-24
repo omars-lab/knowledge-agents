@@ -34,8 +34,14 @@ async def summarize_section(
     client: AsyncOpenAI,
     model: str = DEFAULT_MODEL,
     max_summary_tokens: int = DEFAULT_MAX_SUMMARY_TOKENS,
+    temperature: float = 0.5,
+    enable_thinking: bool = False,
 ) -> str:
     """Summarize a single section via LLM.
+
+    Args:
+        temperature: Sampling temperature (0.0-1.0). Lower = more deterministic.
+        enable_thinking: Whether to allow internal reasoning (uses ~900 extra tokens).
 
     Returns the summary text, or empty string on failure.
     """
@@ -44,7 +50,8 @@ async def summarize_section(
     response = await client.chat.completions.create(
         model=model,
         max_tokens=max_summary_tokens,
-        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        temperature=temperature,
+        extra_body={"chat_template_kwargs": {"enable_thinking": enable_thinking}},
         messages=[
             {
                 "role": "system",
