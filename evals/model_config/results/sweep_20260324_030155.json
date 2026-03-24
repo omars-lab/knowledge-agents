@@ -1,0 +1,142 @@
+[
+  {
+    "config": {
+      "name": "35b-a3b-t0.5-nothink",
+      "model": "qwen3.5-35b-a3b",
+      "temperature": 0.5,
+      "enable_thinking": false,
+      "max_tokens": 2000
+    },
+    "total_cases": 10,
+    "completed": 10,
+    "errors": 0,
+    "avg_duration_ms": 18175,
+    "avg_scores": {
+      "conciseness": 0.33686300872208336,
+      "non_empty": 0.8,
+      "overall": 0.5684315043610416
+    },
+    "cases": [
+      {
+        "case_id": "sum-001",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section catalogs a range of developer tools and resources, from productivity applications like VSCodium to testing libraries with specific notes on mocking strategies. It further includes references for dependency syncing, wiki extensions, and various diagramming utilities such as PlantUML and Kroki.",
+        "duration_ms": 22915,
+        "scores": {
+          "conciseness": 0.2,
+          "non_empty": 1.0,
+          "overall": 0.6
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-002",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section provides reference links for Azure AI Foundry management, including direct access to development environment dashboards for deployments and project overviews. It also cites documentation on migrating projects and a guide for managing OpenAI capacity quotas using Bicep templates.",
+        "duration_ms": 13849,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-003",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section documents workshop discussions questioning whether Sweep and Salesforce MCP tools function as simple prompt connectors or complex agents capable of reverse-engineering processes with robust guardrails and human-in-the-loop oversight. Participants explore how metadata is synthesized into actionable migration artifacts while maintaining determinism through normalized data models and best practices.",
+        "duration_ms": 23017,
+        "scores": {
+          "conciseness": 0.6225895316804406,
+          "non_empty": 1.0,
+          "overall": 0.8112947658402203
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-004",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section covers resources for Enterprise AI Applications, highlighting a BlackRock presentation on scaling compliant knowledge apps with a Kubernetes-native framework. It also lists the \"Vibe Engineering\" book as recommended reading for generative AI development.",
+        "duration_ms": 11931,
+        "scores": {
+          "conciseness": 0.3394736842105263,
+          "non_empty": 1.0,
+          "overall": 0.6697368421052632
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-005",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This quick reference table contrasts ES5 with ES2021 JavaScript syntax, highlighting modern improvements in variables, functions, strings, objects, classes, modules, and asynchronous handling. It emphasizes cleaner code practices through updated constructs like `let`/`const`, arrow functions, template literals, and optional chaining.",
+        "duration_ms": 14520,
+        "scores": {
+          "conciseness": 0.43963963963963965,
+          "non_empty": 1.0,
+          "overall": 0.7198198198198198
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-006",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section outlines an agentic strategy for developing a ServiceNow update set creation artifact, requiring agents to access specific documentation and manage complex multi-table dependencies like catalog items. It recommends utilizing LLM-supported tools such as next-ai-draw-io to visualize these schema relationships via Mermaid diagrams.",
+        "duration_ms": 12139,
+        "scores": {
+          "conciseness": 0.3368421052631579,
+          "non_empty": 1.0,
+          "overall": 0.6684210526315789
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-007",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section outlines goals for building an autonomous cloud agent ecosystem using Claude and MCP protocols to manage personal knowledge graphs and analyze user behavior through custom integrations. Key tasks include enhancing security with hardware tokens, developing browser plugins for data tracking, and scripting local app automation via AI skills.",
+        "duration_ms": 12130,
+        "scores": {
+          "conciseness": 0.722860791826309,
+          "non_empty": 1.0,
+          "overall": 0.8614303959131545
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-008",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section outlines the configuration of a personal automation system in VSCode, including completed Claude Code integration and plans for scripts managing note imports, metadata analysis, and AI-driven cleanup commands. Remaining tasks involve developing plugins for task/calendar management, automating link summaries based on context, and implementing shortcuts for efficient multi-line editing.",
+        "duration_ms": 18658,
+        "scores": {
+          "conciseness": 0.7072243346007605,
+          "non_empty": 1.0,
+          "overall": 0.8536121673003803
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-009",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "",
+        "duration_ms": 26372,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 0.0,
+          "overall": 0.0
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-010",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "",
+        "duration_ms": 26227,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 0.0,
+          "overall": 0.0
+        },
+        "error": null
+      }
+    ]
+  }
+]

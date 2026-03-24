@@ -1,0 +1,702 @@
+[
+  {
+    "config": {
+      "name": "35b-a3b-t0.5-nothink",
+      "model": "qwen3.5-35b-a3b",
+      "temperature": 0.5,
+      "enable_thinking": false,
+      "max_tokens": 2000
+    },
+    "total_cases": 10,
+    "completed": 10,
+    "errors": 0,
+    "avg_duration_ms": 16773,
+    "avg_scores": {
+      "conciseness": 0.3769635964379267,
+      "non_empty": 0.9,
+      "overall": 0.6384817982189633
+    },
+    "cases": [
+      {
+        "case_id": "sum-001",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section compiles links and notes regarding development tools, testing strategies, and documentation utilities, including window management apps, code editors, and diagramming services like PlantUML. It further details technical concepts such as mocking versus spying in unit tests and dependency syncing configurations.",
+        "duration_ms": 17572,
+        "scores": {
+          "conciseness": 0.2,
+          "non_empty": 1.0,
+          "overall": 0.6
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-002",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This reference list provides direct access to Azure AI Foundry deployment and project management interfaces for a specific development workspace. It also includes Microsoft Learn documentation on project migration and external resources regarding capacity quota management via Bicep templates.",
+        "duration_ms": 12482,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-003",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This workshop section evaluates the Sweep MCP tool against Salesforce MCP for automated migration planning, questioning its ability to reverse engineer processes and synthesize artifacts effectively. Key considerations include establishing guardrails, implementing human-in-the-loop oversight, and ensuring deterministic behavior through normalized data models.",
+        "duration_ms": 10401,
+        "scores": {
+          "conciseness": 0.8429752066115701,
+          "non_empty": 1.0,
+          "overall": 0.921487603305785
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-004",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section covers Enterprise AI Application resources, including a BlackRock case study on scaling custom knowledge apps with Kubernetes and compliance, as well as the Vibe Engineering book recommended for GenAI development.",
+        "duration_ms": 14700,
+        "scores": {
+          "conciseness": 0.37894736842105264,
+          "non_empty": 1.0,
+          "overall": 0.6894736842105263
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-005",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This quick reference table contrasts legacy ES5 syntax with modern ES2021 features, highlighting key improvements across variables, functions, strings, objects, classes, modules, asynchronous patterns, and optional chaining.",
+        "duration_ms": 17721,
+        "scores": {
+          "conciseness": 0.3783783783783782,
+          "non_empty": 1.0,
+          "overall": 0.689189189189189
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-006",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section outlines an agentic approach for developing a ServiceNow Update Set creation artifact that requires agents to navigate complex catalog item schemas and dependencies while referencing specific documentation sources. It further recommends visualizing these relationships using Mermaid diagrams via LLM-supported tools and considers infrastructure deployment strategies like vllm.",
+        "duration_ms": 19629,
+        "scores": {
+          "conciseness": 0.2842105263157894,
+          "non_empty": 1.0,
+          "overall": 0.6421052631578947
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-007",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section outlines plans for building a personalized AI infrastructure using custom cloud agents, MCP integrations, and browser plugins to analyze user behavior. It also details technical tasks for securing access, automating Apple Notes scripts via Claude skills, and implementing custom connectors.",
+        "duration_ms": 15040,
+        "scores": {
+          "conciseness": 0.9272030651340996,
+          "non_empty": 1.0,
+          "overall": 0.9636015325670497
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-008",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section outlines a Personal Automation Setup in VS Code where initial integrations with Claude code are complete, while pending tasks focus on developing scripts for note management, metadata analysis, and mobile imports. Future development includes automated command shortcuts for file creation, link title updates, and multi-line editing enhancements.",
+        "duration_ms": 19323,
+        "scores": {
+          "conciseness": 0.7579214195183775,
+          "non_empty": 1.0,
+          "overall": 0.8789607097591887
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-009",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "",
+        "duration_ms": 25959,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 0.0,
+          "overall": 0.0
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-010",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "Action items for the SNL 2026 meeting are pending review by week 5, and key notes indicate Pepsi views the organization as a knowledge management platform based on presented graphs.",
+        "duration_ms": 14908,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      }
+    ]
+  },
+  {
+    "config": {
+      "name": "35b-a3b-t0.3-nothink",
+      "model": "qwen3.5-35b-a3b",
+      "temperature": 0.3,
+      "enable_thinking": false,
+      "max_tokens": 2000
+    },
+    "total_cases": 10,
+    "completed": 10,
+    "errors": 0,
+    "avg_duration_ms": 14129,
+    "avg_scores": {
+      "conciseness": 0.3798244599239773,
+      "non_empty": 0.9,
+      "overall": 0.6399122299619886
+    },
+    "cases": [
+      {
+        "case_id": "sum-001",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "This note section aggregates a diverse set of developer resources, including productivity applications, testing frameworks, dependency syncing tools, and documentation utilities like PlantUML. It also captures technical notes on specific concepts such as mocking versus spying strategies and system library functions like ncurses.",
+        "duration_ms": 14023,
+        "scores": {
+          "conciseness": 0.18571428571428567,
+          "non_empty": 1.0,
+          "overall": 0.5928571428571429
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-002",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "This reference section provides links to Azure AI Foundry deployment hubs, project overviews, and documentation regarding migration and capacity quota management for a specific development environment. The resources include direct access points to the Azure portal alongside external guidance materials.",
+        "duration_ms": 18465,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-003",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "This workshop session explores the architecture of an AI-driven migration tool, comparing Sweep and Salesforce MCP implementations regarding data normalization, agent reasoning, and safety guardrails. Key discussions focus on synthesizing complex information into actionable planning artifacts while ensuring human oversight and deterministic outcomes for migration strategies.",
+        "duration_ms": 9592,
+        "scores": {
+          "conciseness": 0.7327823691460054,
+          "non_empty": 1.0,
+          "overall": 0.8663911845730027
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-004",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "This section highlights a BlackRock case study on their modular, Kubernetes-native framework for scaling enterprise knowledge apps while maintaining compliance in regulated industries. It also recommends the Manning book \"Vibe Engineering\" as essential reading for GenAI development.",
+        "duration_ms": 11253,
+        "scores": {
+          "conciseness": 0.3131578947368421,
+          "non_empty": 1.0,
+          "overall": 0.656578947368421
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-005",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "This syntax quick lookup contrasts ES5 with modern ES2021 JavaScript features, highlighting advancements in variables, functions, strings, and modules. It emphasizes more concise patterns like arrow functions, template literals, classes, async/await, and optional chaining.",
+        "duration_ms": 15394,
+        "scores": {
+          "conciseness": 0.4936936936936937,
+          "non_empty": 1.0,
+          "overall": 0.7468468468468469
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-006",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "This section outlines an agentic approach for developing a Claude Artifact to create ServiceNow Update Sets, emphasizing that agents must reference key documentation and understand complex multi-table schemas like catalog items. It suggests utilizing visualization tools such as Mermaid diagrams via next-ai-draw-io or vllm to map relationships across dependent tables including variables, UI policies, and scripts.",
+        "duration_ms": 8905,
+        "scores": {
+          "conciseness": 0.21052631578947373,
+          "non_empty": 1.0,
+          "overall": 0.6052631578947368
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-007",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "This section outlines plans for developing a personalized AI agent ecosystem focused on knowledge management, user analytics, and automated segmentation. It also details technical requirements for integrating custom scripts and applications via Model Context Protocol (MCP) with Claude to enable advanced automation capabilities.",
+        "duration_ms": 8696,
+        "scores": {
+          "conciseness": 0.9016602809706258,
+          "non_empty": 1.0,
+          "overall": 0.9508301404853129
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-008",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "This section documents the setup of a VS Code-based automation system with completed integrations for note management and Claude code AI. Pending tasks include developing scripts for mobile imports, front matter analysis, link summarization, and custom commands to streamline workflow efficiency.",
+        "duration_ms": 10058,
+        "scores": {
+          "conciseness": 0.9607097591888466,
+          "non_empty": 1.0,
+          "overall": 0.9803548795944232
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-009",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "",
+        "duration_ms": 25774,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 0.0,
+          "overall": 0.0
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-010",
+        "config": "35b-a3b-t0.3-nothink",
+        "summary": "Action items for the \ud83c\udfe2 260129 SNL 2026 meeting are due by week 5 of 2026. Key takeaways indicate Pepsi views our solution as a knowledge management platform supported by graphical data.",
+        "duration_ms": 19134,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      }
+    ]
+  },
+  {
+    "config": {
+      "name": "35b-a3b-t0.7-nothink",
+      "model": "qwen3.5-35b-a3b",
+      "temperature": 0.7,
+      "enable_thinking": false,
+      "max_tokens": 2000
+    },
+    "total_cases": 10,
+    "completed": 10,
+    "errors": 0,
+    "avg_duration_ms": 15050,
+    "avg_scores": {
+      "conciseness": 0.37992648216564695,
+      "non_empty": 0.9,
+      "overall": 0.6399632410828235
+    },
+    "cases": [
+      {
+        "case_id": "sum-001",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "This section lists a variety of software tools and resources for developers, including whiteboarding apps, code editors, testing utilities, and diagramming solutions like PlantUML. It also records technical notes regarding dependency syncing, wiki integrations, and specific concepts such as mocking versus spying.",
+        "duration_ms": 12272,
+        "scores": {
+          "conciseness": 0.2,
+          "non_empty": 1.0,
+          "overall": 0.6
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-002",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "This section lists references comprising direct access links to Azure AI Foundry resources and deployments within a development subscription, alongside Microsoft Learn guides on project migration and Azure OpenAI quota management.",
+        "duration_ms": 15587,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-003",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "The workshop focuses on leveraging AI agents and metadata to reverse engineer processes for migration planning, emphasizing the necessity of guardrails and human-in-the-loop oversight. Participants debated how synthesized artifacts should be utilized to create actionable high-level plans rather than just detailed reports while comparing tools like Sweep MCP against Salesforce.",
+        "duration_ms": 13098,
+        "scores": {
+          "conciseness": 0.6225895316804406,
+          "non_empty": 1.0,
+          "overall": 0.8112947658402203
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-004",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "This section highlights resources for Enterprise AI Applications, including a BlackRock case study on scaling custom Knowledge Apps with compliance and the \"Vibe Engineering\" book recommended for GenAI development.",
+        "duration_ms": 11842,
+        "scores": {
+          "conciseness": 0.4184210526315789,
+          "non_empty": 1.0,
+          "overall": 0.7092105263157895
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-005",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "This table provides a syntax quick lookup comparing legacy ES5 with modern ES2021 features across variables, functions, strings, objects, and modules. It emphasizes key updates such as `let`/`const`, arrow functions, template literals, classes, async/await, and optional chaining.",
+        "duration_ms": 18871,
+        "scores": {
+          "conciseness": 0.4666666666666667,
+          "non_empty": 1.0,
+          "overall": 0.7333333333333334
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-006",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "This section outlines an agentic approach for developing a ServiceNow Artifact to automate Update Set creation, requiring agents to navigate system documentation and comprehend complex table schemas like Catalog Items. It further proposes using Mermaid diagrams for schema visualization and vllm for distributed server inference during development.",
+        "duration_ms": 7780,
+        "scores": {
+          "conciseness": 0.30526315789473685,
+          "non_empty": 1.0,
+          "overall": 0.6526315789473685
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-007",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "These notes outline plans for developing a personalized cloud agent system that integrates user analytics, organization tools, and AI-driven automation via MCP connections. Technical implementation details include creating custom scripts and connectors to enable Claude agents to control applications and manage data securely.",
+        "duration_ms": 15827,
+        "scores": {
+          "conciseness": 0.9016602809706258,
+          "non_empty": 1.0,
+          "overall": 0.9508301404853129
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-008",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "This section tracks the development of a personal automation ecosystem in VS Code, featuring completed integrations with Claude code and note management tools. Pending tasks include creating scripts for metadata analysis, mobile imports, and command shortcuts to streamline note creation and AI-driven cleanup workflows.",
+        "duration_ms": 11350,
+        "scores": {
+          "conciseness": 0.8846641318124209,
+          "non_empty": 1.0,
+          "overall": 0.9423320659062104
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-009",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "",
+        "duration_ms": 26334,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 0.0,
+          "overall": 0.0
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-010",
+        "config": "35b-a3b-t0.7-nothink",
+        "summary": "Action items for the SNL 2026 meeting require verification by week 5 of 2026. Key discussion points indicated Pepsi perceives us as a knowledge management platform, alongside references to graphs and data analysis.",
+        "duration_ms": 17540,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      }
+    ]
+  },
+  {
+    "config": {
+      "name": "35b-a3b-t0.5-think",
+      "model": "qwen3.5-35b-a3b",
+      "temperature": 0.5,
+      "enable_thinking": true,
+      "max_tokens": 4000
+    },
+    "total_cases": 10,
+    "completed": 10,
+    "errors": 0,
+    "avg_duration_ms": 16629,
+    "avg_scores": {
+      "conciseness": 0.3972778803161578,
+      "non_empty": 0.9,
+      "overall": 0.6486389401580789
+    },
+    "cases": [
+      {
+        "case_id": "sum-001",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "This section aggregates links to various development tools, including editors, whiteboarding apps, and diagramming utilities, alongside technical notes on testing strategies like mocking versus spying. It further documents implementation details regarding dependency synchronization, wiki extensions, and specific library inquiries such as ncurses.",
+        "duration_ms": 13985,
+        "scores": {
+          "conciseness": 0.2,
+          "non_empty": 1.0,
+          "overall": 0.6
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-002",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "This section lists reference URLs for accessing Azure AI Foundry deployment and project management interfaces within specific development workspaces. It also includes documentation on migrating projects and a guide for managing Azure OpenAI capacity quotas using Bicep templates.",
+        "duration_ms": 10141,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-003",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "The workshop discussion focuses on defining the architecture and governance of an AI-driven migration tool, emphasizing guardrails, human-in-the-loop processes, and agent reasoning over normalized data graphs beyond simple MCP connections. Key considerations include ensuring agents can synthesize information into actionable artifacts for high-level planning while maintaining business logic alignment.",
+        "duration_ms": 10714,
+        "scores": {
+          "conciseness": 0.650137741046832,
+          "non_empty": 1.0,
+          "overall": 0.8250688705234159
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-004",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "This section details BlackRock\u2019s approach to scaling enterprise knowledge applications using a modular, Kubernetes-native framework that prioritizes compliance. It also recommends Manning\u2019s Vibe Engineering book as a key resource for GenAI development practices.",
+        "duration_ms": 17270,
+        "scores": {
+          "conciseness": 0.3657894736842105,
+          "non_empty": 1.0,
+          "overall": 0.6828947368421052
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-005",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "This reference table contrasts legacy ES5 syntax with modern ES2021 features across variables, functions, strings, and asynchronous operations. It highlights how contemporary standards offer more concise alternatives like template literals, optional chaining, and `async`/`await`.",
+        "duration_ms": 11741,
+        "scores": {
+          "conciseness": 0.4936936936936937,
+          "non_empty": 1.0,
+          "overall": 0.7468468468468469
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-006",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "This section details an agentic approach for developing a ServiceNow update set creation artifact, emphasizing the necessity of consulting official documentation to map complex table schemas and dependencies. It proposes utilizing LLM-supported tools like next-ai-draw-io to generate Mermaid diagrams that visualize relationships across various tables such as catalog items and variables.",
+        "duration_ms": 11656,
+        "scores": {
+          "conciseness": 0.2631578947368421,
+          "non_empty": 1.0,
+          "overall": 0.631578947368421
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-007",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "This section outlines plans for building a personalized AI ecosystem using custom cloud agents and graph-based organization, alongside technical strategies for integrating local apps via MCP and Claude skills to automate workflows and analyze user behavior.",
+        "duration_ms": 15819,
+        "scores": {
+          "conciseness": 1.0,
+          "non_empty": 1.0,
+          "overall": 1.0
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-008",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "Initial steps for a personal VS Code automation system involving note management and Claude integration have been completed. Remaining tasks involve creating scripts and plugins for cross-device syncing, metadata analysis, AI-powered content cleaning, and customizable command shortcuts.",
+        "duration_ms": 10596,
+        "scores": {
+          "conciseness": 1.0,
+          "non_empty": 1.0,
+          "overall": 1.0
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-009",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "",
+        "duration_ms": 51629,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 0.0,
+          "overall": 0.0
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-010",
+        "config": "35b-a3b-t0.5-think",
+        "summary": "Action items for \ud83c\udfe2 260129 SNL 2026 must be completed by week 5 of 2026, and Pepsi perceives the team as a knowledge management platform supported by graphical data.",
+        "duration_ms": 12741,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      }
+    ]
+  },
+  {
+    "config": {
+      "name": "9b-t0.5-nothink",
+      "model": "qwen3.5-9b",
+      "temperature": 0.5,
+      "enable_thinking": false,
+      "max_tokens": 2000
+    },
+    "total_cases": 10,
+    "completed": 10,
+    "errors": 0,
+    "avg_duration_ms": 17216,
+    "avg_scores": {
+      "conciseness": 0.41348239492275124,
+      "non_empty": 1.0,
+      "overall": 0.7067411974613756
+    },
+    "cases": [
+      {
+        "case_id": "sum-001",
+        "config": "9b-t0.5-nothink",
+        "summary": "This section aggregates various developer resources including utility apps like Rectangle, testing libraries such as ts-mockito, and dependency management solutions. It also features links to wiki extensions, diagramming utilities, and whiteboarding software for productivity and technical documentation.",
+        "duration_ms": 24510,
+        "scores": {
+          "conciseness": 0.2714285714285714,
+          "non_empty": 1.0,
+          "overall": 0.6357142857142857
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-002",
+        "config": "9b-t0.5-nothink",
+        "summary": "This reference section lists resources for managing Azure AI Foundry deployments, including official Microsoft Learn guides on project migration. It also includes an external link detailing OpenAI capacity quotas and Bicep configurations.",
+        "duration_ms": 13519,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-003",
+        "config": "9b-t0.5-nothink",
+        "summary": "This workshop section investigates the architecture of an agent-based migration planner utilizing MCP connections, raising key questions about its reverse-engineered processes, guardrails, and artifact synthesis capabilities. Discussions focus on how agents manage normalized data models and business logic while balancing human-in-the-loop oversight against deterministic admin teams.",
+        "duration_ms": 19614,
+        "scores": {
+          "conciseness": 0.7327823691460054,
+          "non_empty": 1.0,
+          "overall": 0.8663911845730027
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-004",
+        "config": "9b-t0.5-nothink",
+        "summary": "This note section outlines resources for Enterprise AI Applications, featuring a BlackRock video on scaling modular, compliant knowledge apps and recommending the \"Vibe Engineering\" book for GenAI development.",
+        "duration_ms": 13431,
+        "scores": {
+          "conciseness": 0.43157894736842106,
+          "non_empty": 1.0,
+          "overall": 0.7157894736842105
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-005",
+        "config": "9b-t0.5-nothink",
+        "summary": "This syntax quick lookup table compares legacy ES5 JavaScript features with their modern ES2021 equivalents across categories like variables, functions, and modules. It illustrates the transition from older patterns such as `var` declarations and callbacks to contemporary standards including `let`, arrow functions, template literals, classes, and async/await.",
+        "duration_ms": 13598,
+        "scores": {
+          "conciseness": 0.37657657657657656,
+          "non_empty": 1.0,
+          "overall": 0.6882882882882883
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-006",
+        "config": "9b-t0.5-nothink",
+        "summary": "This section outlines an agentic approach for developing ServiceNow update set artifacts, requiring agents to consult system properties and best practices documentation while handling complex catalog item dependencies like variables and policies. Implementation involves explaining table schemas and relationships via Mermaid diagrams using LLM-supported tools like next-ai-draw-io, with model management handled through vllm across servers.",
+        "duration_ms": 19022,
+        "scores": {
+          "conciseness": 0.22105263157894733,
+          "non_empty": 1.0,
+          "overall": 0.6105263157894737
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-007",
+        "config": "9b-t0.5-nothink",
+        "summary": "This note section outlines a hybrid agenda combining personal AI infrastructure development with strategic product research on user profiling and behavior tracking. It details actionable tasks like setting up local MCP connectors, building automation scripts for specific apps, and implementing analytics tools alongside references to external resources for agent knowledge and plugin implementation.",
+        "duration_ms": 12739,
+        "scores": {
+          "conciseness": 0.6462324393358876,
+          "non_empty": 1.0,
+          "overall": 0.8231162196679438
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-008",
+        "config": "9b-t0.5-nothink",
+        "summary": "This note section tracks progress on a personal automation setup within VS Code, marking completed plugin configurations and Claude integration alongside numerous pending tasks for scripting metadata analysis, file cleanup commands, and cross-platform note imports.",
+        "duration_ms": 17174,
+        "scores": {
+          "conciseness": 1.0,
+          "non_empty": 1.0,
+          "overall": 1.0
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-009",
+        "config": "9b-t0.5-nothink",
+        "summary": "This section logs a completed Neo4j connection task and catalogs recent updates from December 27, 2025, linking personal tips, references, meal planning resources, and quotes to specific knowledge base pages.",
+        "duration_ms": 17771,
+        "scores": {
+          "conciseness": 0.4551724137931034,
+          "non_empty": 1.0,
+          "overall": 0.7275862068965517
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-010",
+        "config": "9b-t0.5-nothink",
+        "summary": "This section tracks action items for the \ud83c\udfe2 260129 SNL 2026 project due in week 5 of 2026 and notes that Pepsi perceives the platform as a knowledge management solution. It also mentions discussions involving graphs and other materials.",
+        "duration_ms": 20787,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      }
+    ]
+  }
+]

@@ -7,7 +7,7 @@
 | Role | Model | Size | Key Metric | Since |
 |------|-------|------|-----------|-------|
 | **Embedding** | `text-embedding-qwen3-embedding-8b` | 4.68 GB | MTEB #1 (70.58) | 2026-03-23 |
-| **Summarization** | `Qwen3.5-35B-A3B` (MoE) | ~20 GB | MMLU-Pro 85.3 | 2026-03-23 |
+| **Summarization** | `Qwen3.5-9B` (dense) | 6.55 GB | Eval score 0.71, 100% non-empty | 2026-03-24 |
 
 ## Where Models Are Configured
 
@@ -29,6 +29,33 @@ When changing a model, update these locations:
 - All Qdrant collections must be re-indexed if dimensions change
 
 ## Decision Log
+
+### 2026-03-24: Summarization Model → Qwen3.5-9B (replacing 35B-A3B)
+
+**Previous:** `Qwen3.5-35B-A3B` (MoE, 22 GB, 85.3 MMLU-Pro)
+**New:** `Qwen3.5-9B` (dense, 6.55 GB, 82.5 MMLU-Pro)
+
+**Rationale (data-driven, from model config eval sweep):**
+
+| Config | Conciseness | Non-Empty | Overall | Latency |
+|--------|-----------|-----------|---------|---------|
+| 35b-a3b t0.5 nothink | 0.38 | 0.90 | 0.64 | 16.8s |
+| 35b-a3b t0.3 nothink | 0.38 | 0.90 | 0.64 | 14.1s |
+| 35b-a3b t0.7 nothink | 0.38 | 0.90 | 0.64 | 15.1s |
+| 35b-a3b t0.5 think | 0.40 | 0.90 | 0.65 | 16.6s |
+| **9b t0.5 nothink** | **0.41** | **1.00** | **0.71** | 17.2s |
+
+Key findings:
+- 9B produces **higher quality summaries** (0.71 vs 0.64 overall)
+- 9B has **perfect non-empty rate** (1.0 vs 0.9 — 35B occasionally produces empty output due to thinking overhead)
+- 9B is **more concise** (0.41 vs 0.38)
+- 9B uses **1/3 the RAM** (6.55 GB vs 22 GB)
+- Temperature has **negligible effect** on 35B quality (0.64 across 0.3/0.5/0.7)
+- Thinking mode adds **almost no value** for summarization (0.65 vs 0.64)
+
+**Eval details:** 50 runs (5 configs × 10 note sections), scored on conciseness + non-empty. Results in Langfuse (180 scores) and `evals/model_config/results/`.
+
+---
 
 ### 2026-03-23: Summarization Model → Qwen3.5-35B-A3B (MoE)
 

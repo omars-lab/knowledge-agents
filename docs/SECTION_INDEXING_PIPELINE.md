@@ -215,7 +215,7 @@ When `--summarize` is enabled:
 
 | Phase | Model | Size | Purpose |
 |-------|-------|------|---------|
-| B (Summarize) | `Qwen3.5-35B-A3B` (MoE) | ~20 GB | Section summarization (3B active params, 85.3 MMLU-Pro) |
+| B (Summarize) | `Qwen3.5-9B` (dense) | 6.55 GB | Section summarization (eval score 0.71, 100% non-empty) |
 | C (Embed) | `text-embedding-qwen3-embedding-8b` | 4.68 GB | 4096-dim embeddings (MTEB #1) |
 
 Check/load models:

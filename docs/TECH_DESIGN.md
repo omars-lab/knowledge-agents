@@ -29,27 +29,24 @@
 - `nomic-embed-text-v1.5` (768 dims, 84MB) — too low dimensionality for fine-grained section search
 - `jina-embeddings-v5-text-small-retrieval` — state-of-art for retrieval but would require re-indexing everything; dimension mismatch with existing collection
 
-### Summarization: Qwen3.5-35B-A3B (MoE)
+### Summarization: Qwen3.5-9B (dense)
 
 | Property | Value |
 |----------|-------|
-| Model | `lmstudio-community/Qwen3.5-35B-A3B-GGUF` |
-| Size | ~20 GB (Q4_K_M) |
-| Architecture | MoE — 35B total, 3B active per token |
-| MMLU-Pro | 85.3 |
+| Model | `qwen3.5-9b` |
+| Size | 6.55 GB (Q4_K_M) |
+| Architecture | Dense — 9B params, all active |
+| MMLU-Pro | 82.5 |
+| Eval Score | 0.71 overall (best of 5 configs tested) |
 | Use case | Batch note summarization |
-| Concurrency | 3 parallel requests |
 
-**Why:** MoE architecture gives 5x faster throughput than equivalent dense models while scoring 85.3 MMLU-Pro. Surpasses the previous-gen Qwen3-235B-A22B (22B active!) through better training. Perfect for batch summarization: high quality + fast inference.
+**Why (data-driven):** Eval sweep across 5 configs (50 runs total) showed 9B produces better summaries than 35B-A3B MoE (0.71 vs 0.64 overall). The 35B model has a 10% empty-output rate due to thinking mode overhead; 9B has 0%. Uses 1/3 the RAM (6.55 vs 22 GB).
 
-**Decision date:** 2026-03-23
+**Decision date:** 2026-03-24
 
-**Previous model:** `ministral-3-14b-reasoning` (9.12 GB, ~65 MMLU-Pro est.) — replaced due to being outdated generation. Qwen3.5-35B-A3B is ~30% better on benchmarks while only using 3B active params.
+**Previous model:** `Qwen3.5-35B-A3B` (MoE, 22 GB) — replaced because eval data showed lower quality despite higher benchmarks. Thinking mode overhead was the root cause.
 
-**Alternatives considered:**
-- `Qwen3.5-9B` (82.5 MMLU-Pro, ~6 GB) — strong alternative, smaller footprint, but lower quality
-- `Qwen3.5-27B` (higher MMLU, ~17 GB) — best quality but 5x slower than MoE variant
-- `ministral-3-14b-reasoning` (previous) — outdated generation, significantly lower benchmarks
+**Full eval results:** See `docs/MODEL_DECISIONS.md` and Langfuse (180 scores across 5 configs).
 
 ### Claude Agent: Claude API (Opus/Sonnet via subscription)
 

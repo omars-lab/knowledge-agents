@@ -1,0 +1,142 @@
+[
+  {
+    "config": {
+      "name": "35b-a3b-t0.5-nothink",
+      "model": "qwen3.5-35b-a3b",
+      "temperature": 0.5,
+      "enable_thinking": false,
+      "max_tokens": 2000
+    },
+    "total_cases": 10,
+    "completed": 10,
+    "errors": 0,
+    "avg_duration_ms": 16247,
+    "avg_scores": {
+      "conciseness": 0.35471333233262176,
+      "non_empty": 0.9,
+      "overall": 0.6273566661663109
+    },
+    "cases": [
+      {
+        "case_id": "sum-001",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section compiles a list of development tools and resources ranging from visualization apps like Rectangle to testing libraries such as ts-mockito. It also records specific inquiries regarding ncurses, dependency syncing, and the distinctions between mocking and spying.",
+        "duration_ms": 25002,
+        "scores": {
+          "conciseness": 0.2571428571428572,
+          "non_empty": 1.0,
+          "overall": 0.6285714285714286
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-002",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section provides references for an Azure AI Foundry development environment, including direct links to the project overview and deployment hub. Additionally, it cites Microsoft Learn documentation on project migration and a guide for managing OpenAI capacity quotas via Bicep.",
+        "duration_ms": 13012,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-003",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "The workshop focused on defining an MCP-based migration planner that utilizes normalized data models to synthesize artifacts, with a strong emphasis on establishing guardrails and human-in-the-loop oversight. Participants debated the distinction between true agent reasoning versus simple prompt connections, seeking clarity on determinism and how synthesized information guides Salesforce migrations.",
+        "duration_ms": 17258,
+        "scores": {
+          "conciseness": 0.6225895316804406,
+          "non_empty": 1.0,
+          "overall": 0.8112947658402203
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-004",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section highlights resources for Enterprise AI Applications, featuring a BlackRock case study on building scalable, compliant knowledge apps with Kubernetes-native frameworks. It also recommends Manning\u2019s Vibe Engineering book as essential reading for Generative AI development practices.",
+        "duration_ms": 15449,
+        "scores": {
+          "conciseness": 0.3131578947368421,
+          "non_empty": 1.0,
+          "overall": 0.656578947368421
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-005",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This quick reference table compares legacy ES5 JavaScript syntax with modern ES2021 features across variables, functions, strings, objects, classes, modules, and async handling. It highlights key modernizations including block-scoped declarations, arrow functions, template literals, class syntax, and optional chaining.",
+        "duration_ms": 11022,
+        "scores": {
+          "conciseness": 0.4486486486486486,
+          "non_empty": 1.0,
+          "overall": 0.7243243243243243
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-006",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section details an agentic approach for developing a ServiceNow Update Set creation artifact, emphasizing the need for agents to reference key documentation and utilize Mermaid diagrams via `next-ai-draw-io` to visualize complex schema dependencies. It also addresses infrastructure requirements like using vllm across servers while managing intricate catalog item relationships involving multiple tables and scripts.",
+        "duration_ms": 13120,
+        "scores": {
+          "conciseness": 0.22105263157894733,
+          "non_empty": 1.0,
+          "overall": 0.6105263157894737
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-007",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "The notes outline personal productivity goals like setting up a cloud agent, YubiKey, and custom knowledge graph alongside plans to build user segmentation tools. Additionally, they detail technical strategies for leveraging MCP and Claude skills to enable automated app control and analyze user behavior data.",
+        "duration_ms": 17882,
+        "scores": {
+          "conciseness": 0.850574712643678,
+          "non_empty": 1.0,
+          "overall": 0.925287356321839
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-008",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "This section outlines the completion of a personal note management plugin and Claude integration in VS Code, alongside plans for further automation scripts. Future tasks include developing tools for phone imports, front matter analysis, command shortcuts like `/new-plan`, and AI-driven file cleanup to streamline productivity workflows.",
+        "duration_ms": 8342,
+        "scores": {
+          "conciseness": 0.8339670468948035,
+          "non_empty": 1.0,
+          "overall": 0.9169835234474017
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-009",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "",
+        "duration_ms": 26264,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 0.0,
+          "overall": 0.0
+        },
+        "error": null
+      },
+      {
+        "case_id": "sum-010",
+        "config": "35b-a3b-t0.5-nothink",
+        "summary": "Action items for the SNL 2026 section require verification against the W05 deadline. Key discussion points include Pepsi viewing the team as a knowledge management platform alongside various graph-related updates.",
+        "duration_ms": 15119,
+        "scores": {
+          "conciseness": 0.0,
+          "non_empty": 1.0,
+          "overall": 0.5
+        },
+        "error": null
+      }
+    ]
+  }
+]

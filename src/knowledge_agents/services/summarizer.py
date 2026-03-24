@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # LM Studio direct (bypass LiteLLM — needed for chat_template_kwargs passthrough)
 DEFAULT_LM_STUDIO_URL = "http://mac-studio.local:1234/v1"
 DEFAULT_LM_STUDIO_KEY = "lm-studio"
-DEFAULT_MODEL = "qwen3.5-35b-a3b"
+DEFAULT_MODEL = "qwen3.5-9b"
 DEFAULT_MIN_TOKENS = 200
 # Qwen3.5 uses ~800-1000 tokens for internal reasoning even with enable_thinking=false
 # The actual summary is ~50-100 tokens, but we need headroom for the thinking overhead
