@@ -81,38 +81,82 @@ async def run_spike():
     class LMStudioClient(OpenAIGenericClient):
         async def _generate_response(self, messages, response_model=None, max_tokens=DEFAULT_MAX_TOKENS, model_size=ModelSize.medium):
             import json as json_mod
+            import re
+
+            def _extract_json(text: str) -> str:
+                """Extract JSON from model output — strip markdown fences, find JSON object."""
+                text = text.strip()
+                # Strip markdown code fences
+                if '```' in text:
+                    match = re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', text, re.DOTALL)
+                    if match:
+                        text = match.group(1).strip()
+                # Find first { ... } block if there's preamble text
+                if not text.startswith('{'):
+                    idx = text.find('{')
+                    if idx >= 0:
+                        text = text[idx:]
+                # Find matching closing brace
+                if text.startswith('{'):
+                    depth = 0
+                    for i, ch in enumerate(text):
+                        if ch == '{': depth += 1
+                        elif ch == '}': depth -= 1
+                        if depth == 0:
+                            return text[:i+1]
+                return text
+
+            # Build schema instruction
+            schema_instruction = ""
+            if response_model is not None:
+                schema = response_model.model_json_schema()
+                # Simplify schema for the model — show required fields clearly
+                schema_instruction = (
+                    f"\n\nIMPORTANT: Respond with ONLY a valid JSON object matching this schema. "
+                    f"No explanations, no markdown, just the JSON.\n"
+                    f"Schema: {json_mod.dumps(schema, indent=2)}"
+                )
 
             openai_messages = []
             for m in messages:
                 m.content = self._clean_input(m.content)
-                # Inject JSON instruction into system messages
-                if m.role == 'system' and response_model is not None:
-                    schema = response_model.model_json_schema()
-                    m.content += f"\n\nYou MUST respond with ONLY valid JSON matching this schema:\n{json_mod.dumps(schema, indent=2)}"
+                if m.role == 'system' and schema_instruction:
+                    m.content += schema_instruction
                 openai_messages.append({'role': m.role, 'content': m.content})
 
-            response = await self.client.chat.completions.create(
-                model=self.model or LLM_MODEL,
-                messages=openai_messages,
-                temperature=self.temperature,
-                max_tokens=max(max_tokens, 8000),
-                # NO response_format — it conflicts with thinking mode
-                # NO enable_thinking override — let the model think naturally
-            )
+            # Try up to 2 times — retry with error feedback
+            last_error = None
+            for attempt in range(2):
+                response = await self.client.chat.completions.create(
+                    model=self.model or LLM_MODEL,
+                    messages=openai_messages,
+                    temperature=self.temperature,
+                    max_tokens=max(max_tokens, 8000),
+                )
 
-            content = response.choices[0].message.content or ''
-            if not content.strip():
-                raise ValueError("LLM returned empty content")
+                content = response.choices[0].message.content or ''
+                if not content.strip():
+                    last_error = ValueError("LLM returned empty content")
+                    # Add retry hint
+                    openai_messages.append({'role': 'assistant', 'content': ''})
+                    openai_messages.append({'role': 'user', 'content': 'Your response was empty. Please output ONLY the JSON object, nothing else.'})
+                    continue
 
-            # Strip any markdown code fences
-            content = content.strip()
-            if content.startswith('```'):
-                content = content.split('\n', 1)[1] if '\n' in content else content[3:]
-            if content.endswith('```'):
-                content = content.rsplit('```', 1)[0]
-            content = content.strip()
+                json_str = _extract_json(content)
+                try:
+                    parsed = json_mod.loads(json_str)
+                    # Validate against response_model if provided
+                    if response_model is not None:
+                        response_model.model_validate(parsed)
+                    return parsed
+                except (json_mod.JSONDecodeError, Exception) as e:
+                    last_error = e
+                    # Retry with error feedback
+                    openai_messages.append({'role': 'assistant', 'content': content})
+                    openai_messages.append({'role': 'user', 'content': f'Your JSON was invalid: {e}. Fix it and respond with ONLY valid JSON.'})
+                    continue
 
-            return json_mod.loads(content)
+            raise last_error or ValueError("Failed to get valid JSON after retries")
 
     logger.info("=== Graphiti Spike ===")
     logger.info("LLM: %s at %s", LLM_MODEL, LM_STUDIO_URL)
