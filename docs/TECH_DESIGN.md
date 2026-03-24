@@ -118,13 +118,20 @@ Both use 4096-dim Qwen3 embeddings with COSINE distance.
 
 Split complex workflows into separate turns (one tool per turn). Each turn completes within API response windows. Multi-turn sessions maintain context via `session_id`.
 
-## Graph Schema
+## Graph Engine: Graphiti
 
-See [docs/GRAPH_SCHEMA.md](GRAPH_SCHEMA.md) for the complete schema reference (living doc).
+See [docs/GRAPH_SCHEMA.md](GRAPH_SCHEMA.md) for the complete schema reference, and [docs/GRAPHITI_INTEGRATION.md](GRAPHITI_INTEGRATION.md) for the full integration plan and use cases.
 
-Key additions for section indexing:
-- `Section` node type (linked to Note via `HAS_SECTION`)
-- `Section -[:CONTAINS]-> Entity` (section-level entity attribution)
+**Engine:** [Graphiti](https://github.com/getzep/graphiti) — temporal knowledge graph with automatic entity extraction, deduplication, and hybrid search.
+
+**Key capabilities over previous hand-built pipeline:**
+- Temporal fact validity (`valid_at`, `invalid_at`, `expired_at` on every edge)
+- Automatic entity resolution (LLM-powered dedup)
+- Hybrid search (semantic + keyword + graph traversal)
+- Episode provenance (every entity traces back to source notes)
+- Community detection (auto-clustering)
+
+**Models:** Qwen3.5-35B-A3B for extraction (structured JSON), Qwen3-Embedding-8B for embeddings. All local on Mac Studio.
 
 ## Observability
 

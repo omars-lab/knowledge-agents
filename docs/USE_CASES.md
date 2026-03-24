@@ -14,16 +14,17 @@ A living catalog mapping each feature to its implementing code, tests, and evals
 - Guardrails: `src/knowledge_agents/guardrails/input/`, `output/`
 **Tests**: `tst/integration/agents/test_note_query_agent.py`
 
-## UC-2: Knowledge Graph Building (Existing)
+## UC-2: Knowledge Graph Building (Graphiti-Powered)
 
-**What**: Extract entities and relationships from notes into Neo4j
-**Entry point**: `scripts/seed_graph_database.py`, `scripts/build_neo4j_graph.py`
+**What**: Build temporal knowledge graph from notes using Graphiti — automatic entity extraction, deduplication, temporal tracking, hybrid search
+**Entry points**: `build_knowledge_graph` MCP tool, `scripts/seed_sections.py` Phase D, `scripts/spike_graphiti.py`
 **Code**:
-- Agent: `src/knowledge_agents/agents/graph_builder_agent.py`
-- Graph utils: `src/knowledge_agents/utils/graph_utils.py`
-- Neo4j client: `src/knowledge_agents/clients/neo4j_client.py`
-- Types: `src/knowledge_agents/types/graph.py`
-**Tests**: None yet (tracked gap)
+- Graphiti client: `src/knowledge_agents/claude_agent/graphiti_client.py`
+- MCP tools: `src/knowledge_agents/claude_agent/tools.py` (build_knowledge_graph, query_knowledge_graph)
+- Spike: `scripts/spike_graphiti.py`
+**Models**: Qwen3.5-35B-A3B (extraction), Qwen3-Embedding-8B (embeddings)
+**Docs**: `docs/GRAPHITI_INTEGRATION.md`
+**Legacy** (deprecated): `graph_builder_agent.py`, `graph_utils.py` — kept for backward compat with old agentic-api
 
 ## UC-3: NotePlan File Ingestion (Existing)
 

@@ -21,9 +21,8 @@ from neo4j import GraphDatabase
 from openai import OpenAI
 from qdrant_client import QdrantClient
 
-from ..types.graph import Entity, GraphBuilderAgentOutput, Relationship
 from .graphiti_client import get_graphiti, GRAPHITI_GROUP
-from ..utils.graph_utils import create_graph_nodes_and_relationships, setup_graph_schema
+from ..utils.graph_utils import setup_graph_schema  # Still needed for Neo4j index setup
 
 from .config import ClaudeAgentSettings
 

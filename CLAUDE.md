@@ -163,6 +163,10 @@ When discovering non-obvious gotchas, limitations, or workarounds during impleme
 
 16. **Langfuse v3 requires ClickHouse + Redis + MinIO.** Can't use Postgres-only like v2. `CLICKHOUSE_CLUSTER_ENABLED=false` for single-node (no ZooKeeper). `LANGFUSE_INIT_USER_EMAIL` must be valid email format (not `admin@local`).
 
+17. **Graphiti's `response_format: json_schema` conflicts with Qwen3.5 thinking mode.** Empty content when both are used. Fix: custom `LMStudioClient` that injects JSON schema into the system prompt instead and parses JSON from content. See `graphiti_client.py`.
+
+18. **Graphiti uses `Entity` label which conflicts with our old pipeline.** Old entities (without `group_id`) cause `ConstraintValidationFailed` on name uniqueness. Fix: clean old entities before Graphiti ingestion, or use `group_id` partitioning.
+
 ## Testing Rules
 
 ### Never Remove or Skip Tests

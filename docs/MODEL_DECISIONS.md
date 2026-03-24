@@ -8,6 +8,7 @@
 |------|-------|------|-----------|-------|
 | **Embedding** | `text-embedding-qwen3-embedding-8b` | 4.68 GB | MTEB #1 (70.58) | 2026-03-23 |
 | **Summarization** | `Qwen3.5-9B` (dense) | 6.55 GB | Eval score 0.71, 100% non-empty | 2026-03-24 |
+| **Extraction (Graphiti)** | `Qwen3.5-35B-A3B` (MoE) | 22.07 GB | 5/5 episodes, structured JSON | 2026-03-24 |
 
 ## Where Models Are Configured
 

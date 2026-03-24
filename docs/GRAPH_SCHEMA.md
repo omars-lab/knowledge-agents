@@ -2,6 +2,43 @@
 
 > **Living Document** — update when adding node types, relationship types, or link resolution rules.
 > Referenced by: `knowledge-index.md` skill, `render_graph.py`, `link_resolver.py`, `tools.py`
+>
+> **Graph Engine:** [Graphiti](https://github.com/getzep/graphiti) (temporal knowledge graph).
+> Entities are auto-extracted by Graphiti's LLM pipeline. Manual entity extraction is deprecated.
+
+## Graphiti-Specific Nodes
+
+### Episodic
+A raw data episode (source text from a NotePlan section). Every entity and relationship traces back to episodes for provenance.
+
+| Property | Description |
+|----------|-------------|
+| `uuid` | Unique ID |
+| `name` | Episode name (section heading) |
+| `group_id` | Partition key (`noteplan`) |
+| `source` | Source file path |
+| `source_description` | Full description (file + heading path) |
+| `content` | Raw text content |
+| `valid_at` | When this episode was ingested |
+
+### Community
+Auto-detected clusters of related entities (created by Graphiti's community detection).
+
+| Property | Description |
+|----------|-------------|
+| `uuid` | Unique ID |
+| `name` | Community name (auto-generated) |
+| `group_id` | Partition key |
+
+### Graphiti Relationships
+
+| Type | Semantics | Source → Target |
+|------|-----------|----------------|
+| `RELATES_TO` | Temporal fact between entities | Entity → Entity (with `valid_at`, `invalid_at`, `expired_at`, `fact`) |
+| `MENTIONS` | Episode mentions entity | Episodic → Entity |
+| `HAS_EPISODE` | Entity linked to source episode | Entity → Episodic |
+| `NEXT_EPISODE` | Episode sequencing | Episodic → Episodic |
+| `HAS_MEMBER` | Community membership | Community → Entity |
 
 ## Node Types
 
