@@ -141,6 +141,14 @@ When discovering non-obvious gotchas, limitations, or workarounds during impleme
 
 10. **LiteLLM proxy config references are resolved at container start, not at request time.** If the LM Studio IP changes (DHCP) or you switch from IP to hostname, the LiteLLM proxy must be recreated. The config file (`config/litellm_config.yaml`) may also cache the host — check both `docker-compose.yml` env vars AND the config file.
 
+11. **Qwen3.5 thinking mode consumes all tokens if `max_tokens` is too low.** Even with `chat_template_kwargs: {"enable_thinking": false}`, Qwen3.5 models use ~800-1000 tokens for internal reasoning before producing content. With `max_tokens=200`, content is empty. Set `max_tokens=2000+` for summarization. The actual summary is ~50-100 tokens but reasoning overhead is ~900.
+
+12. **LiteLLM strips `chat_template_kwargs` — bypass for LM Studio direct calls.** The `chat_template_kwargs` parameter (needed to control Qwen3.5 thinking mode) is not a standard OpenAI parameter. LiteLLM drops it. For models that need template kwargs, call LM Studio directly at `mac-studio.local:1234` instead of going through the LiteLLM proxy. Use `extra_body={"chat_template_kwargs": {...}}` with the OpenAI Python SDK.
+
+13. **`lms get` requires Staff Pick names, not repo paths.** Use `lms get 'Qwen3.5-35B-A3B@q4_k_m' --yes` (Staff Pick name + quantization). Do NOT use `lms get 'lmstudio-community/Qwen3.5-35B-A3B-GGUF'` — repo-style paths fail with "artifact does not exist". The `@quantization` suffix selects the variant (q4_k_m, q5_k_m, q8_0).
+
+14. **LM Studio version must match model architecture.** Newer model architectures (e.g., `qwen35moe` for Qwen3.5 MoE) require updated LM Studio versions. Error: `unknown model architecture: 'qwen35moe'`. Check version with `defaults read /Applications/LM\ Studio.app/Contents/Info.plist CFBundleShortVersionString`. Update LM Studio before downloading cutting-edge models.
+
 ## Testing Rules
 
 ### Never Remove or Skip Tests
