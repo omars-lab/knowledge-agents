@@ -7,7 +7,7 @@ Note: The @tool() decorator returns SdkMcpTool objects, not callable functions.
 We call .handler(args) to invoke the underlying async function in tests.
 """
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -149,69 +149,48 @@ class TestReadNote:
 
 @pytest.mark.unit
 class TestBuildKnowledgeGraph:
-    """Tests for the build_knowledge_graph tool."""
+    """Tests for the build_knowledge_graph tool (Graphiti-powered)."""
 
     @pytest.fixture(autouse=True)
     def setup_mocks(self):
-        """Set up mocked Neo4j driver."""
+        """Set up mocked settings."""
         import knowledge_agents.claude_agent.tools as tools_mod
 
         self.settings = MagicMock()
         self.settings.neo4j_database = "neo4j"
+        self.settings.noteplan_dir = "/noteplan"
         tools_mod._settings = self.settings
-        tools_mod._neo4j_driver = MagicMock()
-        tools_mod._neo4j_schema_initialized = True  # Skip schema setup
         self.tools_mod = tools_mod
 
     @pytest.mark.asyncio
-    async def test_build_knowledge_graph_success(self):
-        """build_knowledge_graph should create entities and relationships."""
+    async def test_build_knowledge_graph_with_content(self):
+        """build_knowledge_graph should accept file_path + note_content and call Graphiti."""
         from knowledge_agents.claude_agent.tools import build_knowledge_graph
 
-        # Mock the session context manager
-        mock_session = MagicMock()
-        mock_session.__enter__ = MagicMock(return_value=mock_session)
-        mock_session.__exit__ = MagicMock(return_value=False)
-        mock_session.run.return_value.single.return_value = MagicMock()
-        self.tools_mod._neo4j_driver.session.return_value = mock_session
+        mock_graphiti = AsyncMock()
+        with patch("knowledge_agents.claude_agent.tools.get_graphiti", return_value=mock_graphiti) as mock_get:
+            result = await build_knowledge_graph.handler({
+                "file_path": "notes/test.md",
+                "note_content": "Alice works on the AI Project using Neo4j.",
+            })
 
-        result = await build_knowledge_graph.handler({
-            "file_path": "notes/test.md",
-            "entities": [
-                {"name": "Alice", "type": "Person"},
-                {"name": "AI Project", "type": "Project"},
-            ],
-            "relationships": [
-                {
-                    "from_entity": "Alice",
-                    "to_entity": "AI Project",
-                    "type": "WORKS_ON",
-                },
-            ],
-        })
-
-        assert not result.get("is_error")
-        text = result["content"][0]["text"]
-        assert "entities" in text
-        assert "relationships" in text
+            assert not result.get("is_error")
+            text = result["content"][0]["text"]
+            assert "graph" in text.lower()
+            mock_graphiti.add_episode.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_build_knowledge_graph_empty_entities(self):
-        """build_knowledge_graph should handle empty entity lists."""
+    async def test_build_knowledge_graph_no_graphiti(self):
+        """build_knowledge_graph should return error when Graphiti is unavailable."""
         from knowledge_agents.claude_agent.tools import build_knowledge_graph
 
-        mock_session = MagicMock()
-        mock_session.__enter__ = MagicMock(return_value=mock_session)
-        mock_session.__exit__ = MagicMock(return_value=False)
-        self.tools_mod._neo4j_driver.session.return_value = mock_session
-
-        result = await build_knowledge_graph.handler({
-            "file_path": "notes/empty.md",
-            "entities": [],
-            "relationships": [],
-        })
-
-        assert not result.get("is_error")
+        with patch("knowledge_agents.claude_agent.tools.get_graphiti", return_value=None):
+            result = await build_knowledge_graph.handler({
+                "file_path": "notes/test.md",
+                "note_content": "Some content.",
+            })
+            assert result.get("is_error") is True
+            assert "not available" in result["content"][0]["text"]
 
 
 @pytest.mark.unit

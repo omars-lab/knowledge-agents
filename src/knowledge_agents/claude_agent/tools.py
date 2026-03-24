@@ -22,6 +22,7 @@ from openai import OpenAI
 from qdrant_client import QdrantClient
 
 from ..types.graph import Entity, GraphBuilderAgentOutput, Relationship
+from .graphiti_client import get_graphiti, GRAPHITI_GROUP
 from ..utils.graph_utils import create_graph_nodes_and_relationships, setup_graph_schema
 
 from .config import ClaudeAgentSettings
@@ -251,10 +252,11 @@ async def read_note(args: dict[str, Any]) -> dict[str, Any]:
 @tool(
     name="build_knowledge_graph",
     description=(
-        "Build a knowledge graph in Neo4j from extracted entities and relationships. "
-        "You (Claude) should extract entities and relationships from note content, "
-        "then call this tool with the structured data. "
-        "Provide file_path plus lists of entities and relationships."
+        "Build a temporal knowledge graph from note content using Graphiti. "
+        "Graphiti automatically extracts entities and relationships — you just "
+        "provide the file_path and note content. Entities are deduplicated, "
+        "relationships get temporal validity tracking, and everything is searchable "
+        "via hybrid (semantic + keyword + graph) search."
     ),
     input_schema={
         "type": "object",
@@ -263,106 +265,46 @@ async def read_note(args: dict[str, Any]) -> dict[str, Any]:
                 "type": "string",
                 "description": "Relative path of the note file being processed",
             },
-            "entities": {
-                "type": "array",
-                "description": "Entities extracted from the note. Include link metadata when available.",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "name": {"type": "string"},
-                        "type": {
-                            "type": "string",
-                            "description": "Entity type: Person, Project, Topic, Concept, Date, Location, Organization, Tool, Event, Task",
-                        },
-                        "url": {
-                            "type": "string",
-                            "description": "External URL for this entity (website, docs, profile). Optional.",
-                        },
-                        "properties": {
-                            "type": "object",
-                            "description": "Additional metadata: email, repo, date (YYYY-MM-DD), role, status, note_file_path. Optional.",
-                        },
-                    },
-                    "required": ["name", "type"],
-                },
-            },
-            "relationships": {
-                "type": "array",
-                "description": "Relationships between entities",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "from_entity": {"type": "string"},
-                        "to_entity": {"type": "string"},
-                        "type": {
-                            "type": "string",
-                            "description": "RELATED_TO, WORKS_ON, MENTIONS, REFERENCES, OCCURS_AT, BELONGS_TO, PART_OF, CONTAINS",
-                        },
-                        "properties": {
-                            "type": "object",
-                            "description": "Edge metadata: context, role. Optional.",
-                        },
-                    },
-                    "required": ["from_entity", "to_entity", "type"],
-                },
+            "note_content": {
+                "type": "string",
+                "description": "The full text content of the note to extract entities from. If not provided, the tool will read the file.",
             },
         },
-        "required": ["file_path", "entities", "relationships"],
+        "required": ["file_path"],
     },
 )
 async def build_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
-    """Create nodes and relationships in Neo4j from extracted data."""
+    """Ingest a note as a Graphiti episode — automatic entity/relationship extraction."""
+    from datetime import datetime, timezone
+
     file_path = args["file_path"]
-    raw_entities = args.get("entities", [])
-    raw_relationships = args.get("relationships", [])
+    note_content = args.get("note_content")
 
     try:
-        entities = []
-        for e in raw_entities:
-            if not e.get("name"):
-                continue
-            # Merge url + extra properties into the properties dict
-            props = dict(e.get("properties", {}) or {})
-            if e.get("url"):
-                props["url"] = e["url"]
-            entities.append(Entity(name=e["name"], type=e["type"], properties=props))
+        # Read note content if not provided
+        if not note_content:
+            from ..notes.parser import read_noteplan_file
+            full_path = Path(_settings.noteplan_dir) / file_path
+            note_content = read_noteplan_file(full_path)
 
-        relationships = []
-        for r in raw_relationships:
-            if not (r.get("from_entity") and r.get("to_entity")):
-                continue
-            props = dict(r.get("properties", {}) or {})
-            relationships.append(Relationship(
-                from_entity=r["from_entity"],
-                to_entity=r["to_entity"],
-                type=r["type"],
-                properties=props,
-            ))
+        graphiti = await get_graphiti()
+        if not graphiti:
+            return {
+                "content": [{"type": "text", "text": "Graphiti is not available. Check LM Studio status."}],
+                "is_error": True,
+            }
 
-        agent_output = GraphBuilderAgentOutput(
-            entities=entities, relationships=relationships
+        await graphiti.add_episode(
+            name=file_path,
+            episode_body=note_content,
+            source_description=f"NotePlan {file_path}",
+            reference_time=datetime.now(timezone.utc),
+            group_id=GRAPHITI_GROUP,
         )
-
-        entities_count, rels_count = await asyncio.to_thread(
-            create_graph_nodes_and_relationships,
-            _neo4j_driver, file_path, agent_output, _settings.neo4j_database,
-        )
-
-        # Store xcallback URL on the Note node
-        from .link_resolver import resolve_link
-        xcallback = resolve_link("Note", {"file_path": file_path})
-        if xcallback:
-            def _set_xcallback():
-                with _neo4j_driver.session(database=_settings.neo4j_database) as session:
-                    session.run(
-                        "MATCH (n:Note {file_path: $fp}) SET n.xcallback_url = $url",
-                        fp=file_path, url=xcallback,
-                    )
-            await asyncio.to_thread(_set_xcallback)
 
         summary = (
-            f"Knowledge graph updated for '{file_path}': "
-            f"{entities_count} entities, {rels_count} relationships created/updated."
+            f"Knowledge graph updated for '{file_path}' via Graphiti. "
+            f"Entities and temporal relationships extracted automatically."
         )
         logger.info(summary)
         return {"content": [{"type": "text", "text": summary}]}
