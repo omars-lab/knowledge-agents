@@ -21,11 +21,12 @@ class TestSystemPrompt:
         from knowledge_agents.claude_agent.prompts import get_system_prompt
 
         prompt = get_system_prompt()
-        # Active tools (semantic_search disabled, query_graph_cypher is advanced fallback)
+        # Active tools
         tools = [
             "read_note",
             "build_knowledge_graph",
             "query_knowledge_graph",
+            "knowledge_changelog",
             "query_graph_cypher",
             "derive_xcallback_url",
         ]

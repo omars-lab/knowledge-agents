@@ -26,11 +26,19 @@ extracts entities, relationships, and temporal facts
 - Call this after reading a note to add its knowledge to the graph
 
 ### query_knowledge_graph
-Search the temporal knowledge graph using natural language.
+Search the temporal knowledge graph using natural language with optional time filters.
 - Uses Graphiti's hybrid search: semantic similarity + keyword matching + graph traversal
-- Returns entities, relationships, and facts with temporal information
-- Just ask a question — the search strategy is automatic
-- Example: "What tools does Omar use?" or "What projects are related to AI?"
+- Supports temporal filtering:
+  - `as_of_date`: "what did we know as of March 1?" — only facts that existed at that date
+  - `after_date` / `before_date`: filter to a time range
+- Calendar notes automatically carry their date as the fact timestamp
+- Example: "What tools does Omar use?" or with time: query="AI projects", as_of_date="2026-01-01"
+
+### knowledge_changelog
+Show what changed in the knowledge graph between two dates.
+- Returns: new facts, expired facts, new entities, new episodes
+- Use to understand how knowledge evolved: "What changed this week?"
+- Input: start_date and end_date in YYYY-MM-DD format
 
 ### query_graph_cypher
 Execute raw Cypher queries against Neo4j (advanced fallback).

@@ -1,4 +1,169 @@
-# Graphiti Integration: End-to-End with Qwen3.5-35B-A3B for Extraction
+# Temporal Knowledge Tools: Time-Based Queries, Changelog, and Version Tracking
+
+## Context
+
+Graphiti stores temporal data on every edge (`valid_at`, `invalid_at`, `expired_at`, `created_at`) and supports `SearchFilters` with `DateFilter` for time-based queries. However, none of this is exposed through our MCP tools. Additionally, our pipeline always stamps episodes with `datetime.now()`, losing historical timing from the actual notes.
+
+**Three gaps to fill:**
+1. **No temporal search** — `query_knowledge_graph` can't filter by date
+2. **No changelog** — can't ask "what changed between two dates?"
+3. **No historical timestamps** — all episodes stamped "now" instead of actual note dates
+
+**Git integration:** NotePlan files are NOT in a git repo, so git commit hashes aren't available. Instead, we'll use **file modification timestamps** and **calendar note dates** (parseable from filename: `Calendar/20251218.md` → `2025-12-18`).
+
+## Plan
+
+### Step 1: Fix reference_time — use actual note dates, not now()
+
+**Files:** `scripts/seed_sections.py`, `src/knowledge_agents/claude_agent/tools.py`
+
+When ingesting episodes, derive `reference_time` from the note:
+- **Calendar notes** (`Calendar/YYYYMMDD.md`): parse date from filename
+- **Regular notes**: use file modification time from filesystem
+- **Fallback**: `datetime.now()` only if no date available
+
+```python
+import re
+from datetime import datetime, timezone
+
+def _derive_reference_time(file_path: str, noteplan_dir: Path = None) -> datetime:
+    """Derive the best reference time for a note."""
+    # Calendar note: parse YYYYMMDD from filename
+    match = re.match(r"Calendar/(\d{4})(\d{2})(\d{2})\.md$", file_path)
+    if match:
+        return datetime(int(match.group(1)), int(match.group(2)), int(match.group(3)), tzinfo=timezone.utc)
+    # Regular note: use file modification time
+    if noteplan_dir:
+        full_path = noteplan_dir / file_path
+        if full_path.exists():
+            return datetime.fromtimestamp(full_path.stat().st_mtime, tz=timezone.utc)
+    # Fallback
+    return datetime.now(timezone.utc)
+```
+
+Update `seed_sections.py` Phase D and `build_knowledge_graph` tool to use this.
+
+### Step 2: Add temporal search parameters to query_knowledge_graph
+
+**File:** `src/knowledge_agents/claude_agent/tools.py`
+
+Add `as_of_date` and `date_range` parameters to `query_knowledge_graph`:
+
+```python
+@tool(name="query_knowledge_graph", input_schema={
+    "query": {"type": "string"},
+    "as_of_date": {"type": "string", "description": "ISO date — only return facts valid as of this date (YYYY-MM-DD)"},
+    "after_date": {"type": "string", "description": "Only return facts created after this date"},
+    "before_date": {"type": "string", "description": "Only return facts created before this date"},
+    "limit": {"type": "integer"},
+})
+```
+
+Implementation uses Graphiti's `SearchFilters`:
+```python
+from graphiti_core.search.search_filters import SearchFilters, DateFilter, ComparisonOperator
+
+search_filter = None
+if args.get("as_of_date"):
+    dt = datetime.fromisoformat(args["as_of_date"])
+    search_filter = SearchFilters(
+        created_at=[[DateFilter(date=dt, comparison_operator=ComparisonOperator.less_than_equal)]],
+        expired_at=[[DateFilter(date=None, comparison_operator=ComparisonOperator.is_null)]]  # not yet expired
+    )
+```
+
+### Step 3: Add knowledge changelog tool
+
+**File:** `src/knowledge_agents/claude_agent/tools.py`
+
+New MCP tool: `knowledge_changelog`
+
+```python
+@tool(name="knowledge_changelog", description="Show what changed in the knowledge graph between two dates")
+async def knowledge_changelog(args):
+    """Query edges created/expired between two dates."""
+    start_date = parse(args["start_date"])
+    end_date = parse(args["end_date"])
+
+    # New facts (edges created in range)
+    new_facts = cypher: MATCH ()-[r:RELATES_TO]->()
+        WHERE r.created_at >= $start AND r.created_at <= $end
+        RETURN r.name, r.fact, r.created_at
+
+    # Expired facts (edges that became invalid in range)
+    expired_facts = cypher: MATCH ()-[r:RELATES_TO]->()
+        WHERE r.expired_at >= $start AND r.expired_at <= $end
+        RETURN r.name, r.fact, r.expired_at
+
+    # New entities (created in range)
+    new_entities = cypher: MATCH (e:Entity)
+        WHERE e.created_at >= $start AND e.created_at <= $end
+        RETURN e.name, e.created_at
+
+    # New episodes (ingested in range)
+    new_episodes = cypher: MATCH (ep:Episodic)
+        WHERE ep.created_at >= $start AND ep.created_at <= $end
+        RETURN ep.name, ep.source_description, ep.created_at
+```
+
+### Step 4: Store content hash as episode metadata
+
+**File:** `scripts/seed_sections.py`, `src/knowledge_agents/claude_agent/graphiti_client.py`
+
+Since NotePlan isn't in git, store the **content hash** (SHA256) as episode metadata. This enables:
+- "What knowledge came from this specific version of the file?"
+- Change detection: if content_hash differs, facts may have changed
+
+Pass content_hash via episode source_description or a custom field:
+```python
+await graphiti.add_episode(
+    name=section.heading,
+    episode_body=section.raw_text,
+    source_description=f"NotePlan {file_path} :: hash={content_hash}",
+    reference_time=derive_reference_time(file_path),
+    group_id="noteplan",
+)
+```
+
+### Step 5: Update prompts for temporal awareness
+
+**File:** `src/knowledge_agents/claude_agent/prompts.py`
+
+Add temporal workflow guidance:
+```
+### Temporal Queries
+- Use `as_of_date` to ask "what did we know as of March 1?"
+- Use `after_date`/`before_date` to filter to a time range
+- Use `knowledge_changelog` to see what changed between dates
+- Calendar notes automatically carry their date as reference_time
+```
+
+### Step 6: Update tests and docs
+
+- Add unit tests for temporal search params and changelog tool
+- Update `docs/GRAPH_SCHEMA.md` — document temporal fields on edges
+- Update `docs/GRAPHITI_INTEGRATION.md` — add temporal use cases
+- Update `CLAUDE.md` — add changelog to Key Commands if Makefile target added
+
+## Critical Files
+
+| File | Change |
+|------|--------|
+| `src/knowledge_agents/claude_agent/tools.py` | Add temporal params to query tool, add changelog tool |
+| `scripts/seed_sections.py` | Use actual note dates for reference_time |
+| `src/knowledge_agents/claude_agent/prompts.py` | Temporal workflow guidance |
+| `src/knowledge_agents/claude_agent/graphiti_client.py` | Add _derive_reference_time helper |
+| `tst/unit/claude_agent/test_tools.py` | Tests for temporal params + changelog |
+| `docs/GRAPH_SCHEMA.md` | Document temporal edge fields |
+| `docs/GRAPHITI_INTEGRATION.md` | Temporal use cases |
+
+## Verification
+
+1. Unit tests: `make claude-agent-test` — all pass
+2. Re-index with historical dates: `make seed-sections-full` — episodes get correct reference_time
+3. Temporal search: ask agent "What did I know about AI in January 2026?" — should filter by date
+4. Changelog: ask agent "What changed in my knowledge graph this week?" — should show new/expired facts
+5. Langfuse: traces show temporal search filter params
 
 ## Context
 

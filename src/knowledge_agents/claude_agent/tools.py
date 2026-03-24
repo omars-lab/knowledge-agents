@@ -325,20 +325,32 @@ async def build_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
     name="query_knowledge_graph",
     description=(
         "Search the temporal knowledge graph using Graphiti's hybrid search "
-        "(semantic + keyword + graph traversal). Returns entities, relationships, "
-        "and facts with temporal validity. Use natural language queries — "
-        "Graphiti handles the search strategy automatically."
+        "(semantic + keyword + graph traversal). Supports time-based filtering: "
+        "use as_of_date to query 'what did we know then?', or after_date/before_date "
+        "to filter to a time range."
     ),
     input_schema={
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "Natural language search query (e.g., 'What tools does Omar use?')",
+                "description": "Natural language search query",
+            },
+            "as_of_date": {
+                "type": "string",
+                "description": "Only return facts that existed as of this date (ISO format: YYYY-MM-DD). Excludes facts created after this date and facts already expired by this date.",
+            },
+            "after_date": {
+                "type": "string",
+                "description": "Only return facts created after this date (ISO: YYYY-MM-DD)",
+            },
+            "before_date": {
+                "type": "string",
+                "description": "Only return facts created before this date (ISO: YYYY-MM-DD)",
             },
             "limit": {
                 "type": "integer",
-                "description": "Maximum results to return (default 10)",
+                "description": "Maximum results (default 10)",
                 "minimum": 1,
                 "maximum": 50,
             },
@@ -347,7 +359,9 @@ async def build_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
     },
 )
 async def query_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
-    """Search the knowledge graph via Graphiti hybrid search."""
+    """Search the knowledge graph via Graphiti hybrid search with optional temporal filtering."""
+    from datetime import datetime as dt
+
     search_query = args["query"]
     limit = args.get("limit", 10)
 
@@ -355,26 +369,59 @@ async def query_knowledge_graph(args: dict[str, Any]) -> dict[str, Any]:
         graphiti = await get_graphiti()
         if not graphiti:
             return {
-                "content": [{"type": "text", "text": "Graphiti is not available. Check LM Studio status."}],
+                "content": [{"type": "text", "text": "Graphiti is not available."}],
                 "is_error": True,
             }
+
+        # Build temporal search filters
+        search_filter = None
+        filter_parts = []
+
+        try:
+            from graphiti_core.search.search_filters import SearchFilters, DateFilter, ComparisonOperator
+
+            created_at_filters = []
+            expired_at_filters = []
+
+            if args.get("as_of_date"):
+                as_of = dt.fromisoformat(args["as_of_date"]).replace(tzinfo=timezone.utc)
+                created_at_filters.append(DateFilter(date=as_of, comparison_operator=ComparisonOperator.less_than_equal))
+                # Exclude expired facts (expired_at is null OR expired_at > as_of_date)
+                filter_parts.append(f"as_of={args['as_of_date']}")
+
+            if args.get("after_date"):
+                after = dt.fromisoformat(args["after_date"]).replace(tzinfo=timezone.utc)
+                created_at_filters.append(DateFilter(date=after, comparison_operator=ComparisonOperator.greater_than_equal))
+                filter_parts.append(f"after={args['after_date']}")
+
+            if args.get("before_date"):
+                before = dt.fromisoformat(args["before_date"]).replace(tzinfo=timezone.utc)
+                created_at_filters.append(DateFilter(date=before, comparison_operator=ComparisonOperator.less_than_equal))
+                filter_parts.append(f"before={args['before_date']}")
+
+            if created_at_filters or expired_at_filters:
+                search_filter = SearchFilters(
+                    created_at=[created_at_filters] if created_at_filters else None,
+                    expired_at=[expired_at_filters] if expired_at_filters else None,
+                )
+        except ImportError:
+            logger.debug("SearchFilters not available — running unfiltered search")
 
         results = await graphiti.search(
             search_query,
             group_ids=[GRAPHITI_GROUP],
             num_results=limit,
+            **({"search_filter": search_filter} if search_filter else {}),
         )
 
         if not results:
-            return {"content": [{"type": "text", "text": f"No results found for: {search_query}"}]}
+            filter_desc = f" (filters: {', '.join(filter_parts)})" if filter_parts else ""
+            return {"content": [{"type": "text", "text": f"No results found for: {search_query}{filter_desc}"}]}
 
-        # Format results for the agent
-        formatted = []
-        for r in results:
-            formatted.append(str(r))
-
-        text = f"Found {len(results)} results:\n\n" + "\n\n".join(formatted)
-        logger.info("query_knowledge_graph returned %d results for: %s", len(results), search_query[:60])
+        formatted = [str(r) for r in results]
+        filter_desc = f" | Filters: {', '.join(filter_parts)}" if filter_parts else ""
+        text = f"Found {len(results)} results{filter_desc}:\n\n" + "\n\n".join(formatted)
+        logger.info("query_knowledge_graph: %d results for '%s'%s", len(results), search_query[:60], filter_desc)
         return {"content": [{"type": "text", "text": text}]}
 
     except Exception as e:
@@ -432,6 +479,110 @@ async def query_graph_cypher(args: dict[str, Any]) -> dict[str, Any]:
             "content": [{"type": "text", "text": f"Error: {e}"}],
             "is_error": True,
         }
+
+
+@tool(
+    name="knowledge_changelog",
+    description=(
+        "Show what changed in the knowledge graph between two dates. "
+        "Returns new facts, expired facts, new entities, and new episodes. "
+        "Use this to understand how knowledge evolved over a time period."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "start_date": {
+                "type": "string",
+                "description": "Start of date range (ISO: YYYY-MM-DD)",
+            },
+            "end_date": {
+                "type": "string",
+                "description": "End of date range (ISO: YYYY-MM-DD)",
+            },
+        },
+        "required": ["start_date", "end_date"],
+    },
+)
+async def knowledge_changelog(args: dict[str, Any]) -> dict[str, Any]:
+    """Query edges/entities/episodes created or expired between two dates."""
+    from datetime import datetime as dt
+
+    try:
+        start = dt.fromisoformat(args["start_date"]).replace(tzinfo=timezone.utc)
+        end = dt.fromisoformat(args["end_date"]).replace(tzinfo=timezone.utc)
+    except (ValueError, KeyError) as e:
+        return {"content": [{"type": "text", "text": f"Invalid date format: {e}. Use YYYY-MM-DD."}], "is_error": True}
+
+    try:
+        def _run_changelog():
+            with _neo4j_driver.session(database=_settings.neo4j_database) as session:
+                sections = []
+
+                # New facts (RELATES_TO edges created in range)
+                r = session.run(
+                    "MATCH (a:Entity)-[r:RELATES_TO]->(b:Entity) "
+                    "WHERE r.created_at >= $start AND r.created_at <= $end "
+                    "RETURN a.name AS from_entity, r.name AS relation, r.fact AS fact, b.name AS to_entity, r.created_at AS created "
+                    "ORDER BY r.created_at DESC LIMIT 50",
+                    start=start.isoformat(), end=end.isoformat(),
+                )
+                new_facts = [dict(rec) for rec in r]
+                if new_facts:
+                    sections.append(f"## New Facts ({len(new_facts)})\n" + "\n".join(
+                        f"- {f['from_entity']} → {f['relation']} → {f['to_entity']}: {f.get('fact', '')}" for f in new_facts
+                    ))
+
+                # Expired facts
+                r = session.run(
+                    "MATCH (a:Entity)-[r:RELATES_TO]->(b:Entity) "
+                    "WHERE r.expired_at >= $start AND r.expired_at <= $end "
+                    "RETURN a.name AS from_entity, r.name AS relation, r.fact AS fact, b.name AS to_entity, r.expired_at AS expired "
+                    "ORDER BY r.expired_at DESC LIMIT 50",
+                    start=start.isoformat(), end=end.isoformat(),
+                )
+                expired_facts = [dict(rec) for rec in r]
+                if expired_facts:
+                    sections.append(f"## Expired Facts ({len(expired_facts)})\n" + "\n".join(
+                        f"- {f['from_entity']} → {f['relation']} → {f['to_entity']}: {f.get('fact', '')}" for f in expired_facts
+                    ))
+
+                # New entities
+                r = session.run(
+                    "MATCH (e:Entity) WHERE e.created_at >= $start AND e.created_at <= $end AND e.group_id IS NOT NULL "
+                    "RETURN e.name AS name, e.created_at AS created ORDER BY e.created_at DESC LIMIT 50",
+                    start=start.isoformat(), end=end.isoformat(),
+                )
+                new_entities = [dict(rec) for rec in r]
+                if new_entities:
+                    sections.append(f"## New Entities ({len(new_entities)})\n" + "\n".join(
+                        f"- {e['name']}" for e in new_entities
+                    ))
+
+                # New episodes
+                r = session.run(
+                    "MATCH (ep:Episodic) WHERE ep.created_at >= $start AND ep.created_at <= $end AND ep.group_id IS NOT NULL "
+                    "RETURN ep.name AS name, ep.source_description AS source ORDER BY ep.created_at DESC LIMIT 50",
+                    start=start.isoformat(), end=end.isoformat(),
+                )
+                new_episodes = [dict(rec) for rec in r]
+                if new_episodes:
+                    sections.append(f"## New Episodes ({len(new_episodes)})\n" + "\n".join(
+                        f"- {e['name']} ({e.get('source', '')})" for e in new_episodes
+                    ))
+
+                if not sections:
+                    return f"No changes found between {args['start_date']} and {args['end_date']}."
+
+                header = f"# Knowledge Changelog: {args['start_date']} → {args['end_date']}\n\n"
+                return header + "\n\n".join(sections)
+
+        text = await asyncio.to_thread(_run_changelog)
+        logger.info("knowledge_changelog: %s → %s", args["start_date"], args["end_date"])
+        return {"content": [{"type": "text", "text": text}]}
+
+    except Exception as e:
+        logger.error("knowledge_changelog error: %s", e, exc_info=True)
+        return {"content": [{"type": "text", "text": f"Error: {e}"}], "is_error": True}
 
 
 @tool(
@@ -501,6 +652,7 @@ ALL_TOOLS = [
     read_note,
     build_knowledge_graph,
     query_knowledge_graph,
+    knowledge_changelog,
     query_graph_cypher,
     derive_xcallback_url,
 ]
@@ -509,6 +661,7 @@ TOOL_NAMES = [
     "mcp__notes__read_note",
     "mcp__notes__build_knowledge_graph",
     "mcp__notes__query_knowledge_graph",
+    "mcp__notes__knowledge_changelog",
     "mcp__notes__query_graph_cypher",
     "mcp__notes__derive_xcallback_url",
 ]

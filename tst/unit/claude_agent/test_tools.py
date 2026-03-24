@@ -421,6 +421,6 @@ class TestMCPServerCreation:
         """TOOL_NAMES should follow mcp__<server>__<tool> convention."""
         from knowledge_agents.claude_agent.tools import TOOL_NAMES
 
-        assert len(TOOL_NAMES) == 5  # read_note, build_knowledge_graph, query_knowledge_graph, query_graph_cypher, derive_xcallback_url
+        assert len(TOOL_NAMES) == 6  # read_note, build_knowledge_graph, query_knowledge_graph, knowledge_changelog, query_graph_cypher, derive_xcallback_url
         for name in TOOL_NAMES:
             assert name.startswith("mcp__notes__"), f"Invalid tool name: {name}"
