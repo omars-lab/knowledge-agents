@@ -267,10 +267,10 @@ async def stream_agent_response(
                     elapsed_ms,
                 )
 
-                # Langfuse: end trace with result
+                # Langfuse: update trace with output, then end
                 if trace:
                     try:
-                        trace.end(
+                        trace.update(
                             output=collected_text[:1000],
                             metadata={
                                 "session_id": result_session_id,
@@ -280,6 +280,7 @@ async def stream_agent_response(
                                 "tools_used": [tc["name"] for tc in tool_calls],
                             },
                         )
+                        trace.end()
                     except Exception:
                         pass
 
