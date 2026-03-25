@@ -561,8 +561,6 @@ claude-agent-integration-test: ## Run Claude Agent integration tests (requires r
 EVAL_DOCKER = docker compose run --rm \
 	-e AGENT_BASE_URL=http://claude-agent:8000 \
 	-e PYTHONPATH=/app \
-	-v $$(pwd)/build:/app/build \
-	-v $$(pwd)/evals:/app/evals \
 	test
 
 claude-agent-eval: ## Run full Claude Agent eval suite (in Docker, works locally or on Mac Studio)

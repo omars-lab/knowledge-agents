@@ -181,6 +181,7 @@ services:
       - ./build:/app/build
       - ./tst:/app/tst
       - ./src:/app/src
+      - ./evals:/app/evals
       - ./scripts/containers/test:/app/scripts/containers/test:ro
     depends_on:
       postgres:
