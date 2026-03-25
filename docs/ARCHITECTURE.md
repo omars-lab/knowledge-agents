@@ -157,6 +157,6 @@ make cross-network-check     # Verify all reachable from Kong
 | claude-agent | 8000 | 8004 | Conversational agent |
 | chat | 80 | 8080 | Chat UI (nginx) |
 | prometheus | 9090 | 9090 | Metrics |
-| grafana | 3000 | 3001 | Dashboards |
+| grafana | 3000 | 3002 | Dashboards + Logs |
 | loki | 3100 | 3100 | Log aggregation |
 | langfuse | 3000 | 3210 | LLM tracing |

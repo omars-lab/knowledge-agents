@@ -104,7 +104,7 @@ Checks 5 categories:
 2. **Database connectivity** — Qdrant (:6333), Neo4j (:7474), Postgres
 3. **LM Studio** — embedding model loaded (:1234)
 4. **Container status** — no Restarting/Exit containers
-5. **Observability** — Prometheus (:9090), Grafana (:3001), Langfuse (:3210, optional)
+5. **Observability** — Prometheus (:9090), Grafana (:3002), Loki (:3100), Langfuse (:3210, optional)
 
 ### 7. Seed Claude Agent auth
 
