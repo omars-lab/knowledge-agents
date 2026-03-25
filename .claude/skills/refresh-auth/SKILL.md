@@ -38,8 +38,37 @@ make claude-agent-login
 ```
 Opens the Claude OAuth flow inside the container — produces a browser URL to visit. The token is stored directly in the container's named volume.
 
-### Method 3: API Key (no OAuth, pay-as-you-go billing)
+### Method 3: Cross-machine seed (MacBook → Mac Studio)
+
+When deploying to the Mac Studio, the keychain may be locked (no GUI session). Seed from the MacBook's keychain instead:
+
+```bash
+# Extract creds from MacBook keychain, pipe to Mac Studio container
+CREDS=$(security find-generic-password -s 'Claude Code-credentials' -w)
+echo "$CREDS" | ssh mac-studio "zsh -l -c 'cat > /tmp/claude_creds.json && \
+  docker cp /tmp/claude_creds.json knowledge-agents-claude-agent-1:/home/agent/.claude/.credentials.json && \
+  docker exec -u root knowledge-agents-claude-agent-1 chown agent:agent /home/agent/.claude/.credentials.json && \
+  rm /tmp/claude_creds.json'"
+```
+
+This works because OAuth tokens are not machine-specific — the same token works from any host.
+
+### Method 4: API Key (no OAuth, pay-as-you-go billing)
 Set `ANTHROPIC_API_KEY` in `.env` and it's passed to the container via docker-compose. This bypasses OAuth entirely but uses API billing instead of subscription.
+
+## Unlocking the macOS Keychain via SSH
+
+The keychain locks when no GUI session is active. To unlock it remotely:
+
+```bash
+# Interactive — will prompt for password
+ssh mac-studio "security unlock-keychain ~/Library/Keychains/login.keychain-db"
+```
+
+If the keychain is locked, `make claude-agent-auth-seed` and `docker build` (which uses Docker credential helpers) will both fail. Options:
+1. VNC/Screen Sharing to the Mac Studio to unlock
+2. Use the cross-machine seed method (Method 3) from the MacBook
+3. Set `ANTHROPIC_API_KEY` in `.env` to bypass OAuth entirely
 
 ## Check Status
 ```bash

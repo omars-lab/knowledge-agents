@@ -106,19 +106,24 @@ Checks 5 categories:
 4. **Container status** — no Restarting/Exit containers
 5. **Observability** — Prometheus (:9090), Grafana (:3001), Langfuse (:3210, optional)
 
-### 7. Start the Claude Agent
+### 7. Seed Claude Agent auth
 
-After the stack is up, start the Claude Agent and seed auth:
+The claude-agent container needs OAuth credentials. On remote deploys the Mac Studio keychain is typically locked, so seed from the MacBook's keychain:
+
 ```bash
-make claude-agent-up
-make claude-agent-auth-seed
-make claude-agent-auth-status
+# Cross-machine seed (MacBook → Mac Studio container)
+CREDS=$(security find-generic-password -s 'Claude Code-credentials' -w)
+echo "$CREDS" | ssh mac-studio "zsh -l -c 'cat > /tmp/claude_creds.json && \
+  docker cp /tmp/claude_creds.json knowledge-agents-claude-agent-1:/home/agent/.claude/.credentials.json && \
+  docker exec -u root knowledge-agents-claude-agent-1 chown agent:agent /home/agent/.claude/.credentials.json && \
+  rm /tmp/claude_creds.json'"
 ```
 
-Or check if it's already running:
-```bash
-curl -sf http://localhost:8004/health
-```
+Or if the keychain is unlocked on the Mac Studio: `make claude-agent-auth-seed`
+
+Verify with: `make claude-agent-auth-status`
+
+See `/refresh-auth` for full auth management details.
 
 ## Troubleshooting
 
@@ -131,6 +136,10 @@ curl -sf http://localhost:8004/health
 | `LM Studio` check fails | `make lm-studio-status` and `make lm-studio-load-embeddings` |
 | Container unhealthy after deploy | `make deploy-logs` to check errors |
 | Env var changes not picked up | `docker compose up -d --force-recreate <service>` (see CLAUDE.md gotcha #9) |
+| Claude agent 500 errors | Auth not seeded — use cross-machine seed from MacBook (see step 7) |
+| `docker build` fails with keychain error | macOS keychain locked — unlock via Screen Sharing or use cross-machine seed |
+| `No valid credentials in Keychain` | Run `claude auth login` on the host, or use cross-machine seed |
+| Postgres port conflict | Set `POSTGRES_HOST_PORT=5433` in `.env` on Mac Studio |
 
 ## Key Files
 
