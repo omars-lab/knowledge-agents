@@ -267,3 +267,10 @@ These documents must be kept up to date as features are added or changed:
 - **`CLAUDE.md`** -- When adding new commands, conventions, or architectural patterns
 - **`DEVELOPMENT.md`** -- When changing build/test workflows or architecture
 - **`README.md`** -- When changing setup instructions or project overview
+
+## Secrets Policy
+
+- **NEVER commit passwords, tokens, or API keys to git.** All secrets go in `.env` (git-ignored). Use `.env.example` as the template with safe placeholder values.
+- **NEVER output secret values in conversation.** If you need to reference a secret, describe which env var it is, not its value.
+- When adding new services that need credentials, add the env var to `.env.example` with a `changeme` placeholder and reference it in `docker-compose.yml` via `${VAR:-default}`.
+- Langfuse credentials are in `.env` — the compose file defaults are intentionally insecure placeholders that only work for local dev.
