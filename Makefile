@@ -558,24 +558,30 @@ claude-agent-integration-test: ## Run Claude Agent integration tests (requires r
 	docker compose run --rm -v $(PWD)/build:/app/build -v $(PWD)/tst:/app/tst -v $(PWD)/src:/app/src test pytest tst/integration/claude_agent/ -v -m "claude_agent" --log-cli-level=INFO
 	@echo "✅ Claude Agent integration tests completed"
 
-claude-agent-eval: ## Run full Claude Agent eval suite
+EVAL_DOCKER = docker compose run --rm \
+	-e AGENT_BASE_URL=http://claude-agent:8000 \
+	-v $$(pwd)/build:/app/build \
+	-v $$(pwd)/evals:/app/evals \
+	test
+
+claude-agent-eval: ## Run full Claude Agent eval suite (in Docker, works locally or on Mac Studio)
 	@echo "📊 Running Claude Agent eval suite..."
-	@conda run -n $(conda-env-name) python -m evals.claude_agent.runner
+	@$(call run,$(EVAL_DOCKER) python -m evals.claude_agent.runner)
 	@echo "✅ Eval suite completed"
 
 claude-agent-eval-search: ## Run only search evals
 	@echo "📊 Running search evals..."
-	@conda run -n $(conda-env-name) python -m evals.claude_agent.runner --dataset note_search
+	@$(call run,$(EVAL_DOCKER) python -m evals.claude_agent.runner --dataset note_search)
 	@echo "✅ Search evals completed"
 
 claude-agent-eval-graph: ## Run only graph evals
 	@echo "📊 Running graph evals..."
-	@conda run -n $(conda-env-name) python -m evals.claude_agent.runner --dataset graph_building
+	@$(call run,$(EVAL_DOCKER) python -m evals.claude_agent.runner --dataset graph_building)
 	@echo "✅ Graph evals completed"
 
 claude-agent-eval-report: ## Generate eval report from latest results
 	@echo "📊 Generating eval report..."
-	@conda run -n $(conda-env-name) python -m evals.claude_agent.report
+	@$(call run,$(EVAL_DOCKER) python -m evals.claude_agent.report)
 	@echo "✅ Eval report generated"
 
 claude-agent-clean-sessions: ## Clean up old session workspaces

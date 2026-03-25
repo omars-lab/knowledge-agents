@@ -47,10 +47,15 @@ make model-eval-report              # Generate comparison report
 
 ### Running Agent Evals
 
-1. Ensure claude-agent is running: `make claude-agent-up && make claude-agent-auth-seed`
-2. Run: `make claude-agent-eval`
-3. Review: `make claude-agent-eval-report`
-4. Check Langfuse for traces: http://localhost:3210 → filter by "chat" name
+Evals run in the Docker `test` container and talk to the `claude-agent` container via Docker networking (`http://claude-agent:8000`). This works both locally and on the Mac Studio — the `run` macro routes to the right host.
+
+1. Ensure the stack is deployed: `/deploy` or `make deploy`
+2. Ensure claude-agent is healthy: `make verify`
+3. Run: `make claude-agent-eval`
+4. Review: `make claude-agent-eval-report`
+5. Check Langfuse for traces: http://localhost:3210 → filter by "chat" name
+
+The eval targets use the `run` macro — when run from a MacBook, they SSH to the Mac Studio and execute there. Results are written to `evals/claude_agent/results/` (mounted volume).
 
 ### Running Model Config Evals
 
