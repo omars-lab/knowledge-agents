@@ -627,6 +627,14 @@ seed-sections-summarize: ## Index sections with LLM summarization
 		--noteplan-dir "$(NOTEPLAN_DIR)" --summarize --concurrency 3 --delay 1
 
 claude-agent-chat: ## Quick test of Claude Agent chat (usage: make claude-agent-chat MSG="your question")
+claude-agent-changelog: ## Render temporal knowledge graph (usage: make claude-agent-changelog START=2026-03-17 END=2026-03-24)
+	@if [ -z "$(START)" ] || [ -z "$(END)" ]; then echo "❌ Usage: make claude-agent-changelog START=YYYY-MM-DD END=YYYY-MM-DD"; exit 1; fi
+	@conda run -n $(conda-env-name) python scripts/render_temporal_graph.py \
+		--start "$(START)" --end "$(END)" --output build/graphs/changelog.svg
+	@echo "📊 Opening changelog graph..."
+	@open build/graphs/changelog.svg 2>/dev/null || echo "  Open: build/graphs/changelog.svg"
+
+claude-agent-chat: ## Quick test of Claude Agent chat (usage: make claude-agent-chat MSG="your question")
 	@if [ -z "$(MSG)" ]; then echo "❌ Please provide MSG=\"your question\""; exit 1; fi
 	@echo "💬 Sending message to Claude Agent: $(MSG)"
 	@curl -s -X POST "http://localhost:8004/api/v1/chat" \
