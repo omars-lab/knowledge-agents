@@ -27,6 +27,9 @@ gradio>=4.0.0
 # Neo4j driver
 neo4j>=5.15.0
 
+# Qdrant (imported via clients/__init__.py)
+qdrant-client>=1.7.0
+
 # Agents framework (needed for graph builder agent)
 openai-agents==0.5.1
 openai-agents[litellm]==0.5.1

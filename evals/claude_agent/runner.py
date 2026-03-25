@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 DATASETS_DIR = Path(__file__).parent / "datasets"
 RESULTS_DIR = Path(__file__).parent / "results"
-AGENT_BASE_URL = "http://localhost:8004"
+AGENT_BASE_URL = os.environ.get("AGENT_BASE_URL", "http://localhost:8004")
 REQUEST_TIMEOUT = 300  # seconds per HTTP request
 DELAY_BETWEEN_CASES = 3  # seconds between eval test cases (rate limit spacing)
 LLM_GRADING = False  # opt-in LLM-based quality grading
