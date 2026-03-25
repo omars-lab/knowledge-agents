@@ -1,3 +1,9 @@
+---
+name: agent-debug
+description: Debug workflow for Claude Agent issues — logs, auth, tool failures
+user_invocable: true
+---
+
 # /agent-debug — Debug a failing agent interaction
 
 Debug workflow for Claude Agent issues.

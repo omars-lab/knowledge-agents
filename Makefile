@@ -13,7 +13,7 @@
 #   All health check and helper logic has been moved to scripts/makefile-helper.sh
 #   This script contains reusable functions for complex Makefile operations.
 
-.PHONY: help start build test clean format lint type-check docker-up docker-down litellm litellm-embedding litellm-code tidy-mcp-up tidy-mcp-down tidy-mcp-restart tidy-mcp-logs tidy-mcp-test test-tools neo4j-seed-vector neo4j-seed-graph neo4j-build-graph neo4j-query neo4j-graph-builder-up neo4j-graph-builder-down neo4j-graph-builder-restart neo4j-graph-builder-logs claude-agent-up claude-agent-down claude-agent-logs claude-agent-test claude-agent-eval claude-agent-clean-sessions
+.PHONY: help start build test clean format lint type-check docker-up docker-down litellm litellm-embedding litellm-code tidy-mcp-up tidy-mcp-down tidy-mcp-restart tidy-mcp-logs tidy-mcp-test test-tools neo4j-seed-vector neo4j-seed-graph neo4j-build-graph neo4j-query neo4j-graph-builder-up neo4j-graph-builder-down neo4j-graph-builder-restart neo4j-graph-builder-logs claude-agent-up claude-agent-down claude-agent-logs claude-agent-test claude-agent-eval claude-agent-clean-sessions local-deploy deploy deploy-status deploy-down deploy-logs verify
 
 # =============================================================================
 # MAIN TARGETS
@@ -692,3 +692,157 @@ langfuse-down: ## Stop Langfuse stack
 
 langfuse-open: ## Open Langfuse UI in browser
 	@open http://localhost:3210 2>/dev/null || echo "Open: http://localhost:3210"
+
+# =============================================================================
+# DEPLOY TARGETS
+# =============================================================================
+#
+# Git-based deploy. Detects whether running on Mac Studio (local) or remote.
+#   Local (Mac Studio):  git pull + build + start — no SSH needed.
+#   Remote (MacBook):    push + SSH to Mac Studio, then same steps.
+# Never use rsync — all changes must go through git.
+#
+# On Mac Studio, LM_STUDIO_HOST is set to localhost (LM Studio runs there).
+
+STUDIO_HOST ?= mac-studio
+STUDIO_PATH ?= ~/Workspace/git/knowledge-agents
+
+# ── Host detection ────────────────────────────────────────────────────────────
+# Reuse hosts.yml if it exists (same pattern as private-site), otherwise
+# fall back to hostname-based detection.
+IS_STUDIO := $(shell \
+	if [ -f hosts.yml ]; then \
+		MY_SERIAL=$$(system_profiler SPHardwareDataType 2>/dev/null | awk '/Serial Number/ {print $$NF}'); \
+		grep -q "$$MY_SERIAL" hosts.yml 2>/dev/null && \
+		awk "/$$MY_SERIAL/,/role/" hosts.yml | grep -q 'role: prod' && echo true || echo false; \
+	else \
+		hostname | grep -qi "mac-studio" && echo true || echo false; \
+	fi)
+
+# Helper: run a command locally or via SSH depending on IS_STUDIO
+run = $(if $(filter true,$(IS_STUDIO)),cd $(STUDIO_PATH) && $(1),ssh $(STUDIO_HOST) "zsh -l -c 'cd $(STUDIO_PATH) && $(1)'")
+
+.PHONY: local-deploy deploy deploy-status deploy-down deploy-logs
+
+local-deploy: ## Deploy stack locally (LM_STUDIO_HOST=localhost)
+	@echo "── Deploying locally (LM_STUDIO_HOST=localhost) ──"
+	LM_STUDIO_HOST=localhost $(MAKE) start
+	@echo ""
+	@echo "✓ Local deploy complete — API at http://localhost:8004"
+
+deploy: ## Deploy to Mac Studio (or locally if already on Mac Studio)
+	@echo "── Pre-flight: git status ──"
+	@if [ -n "$$(git status -s --ignore-submodules)" ]; then \
+		echo "✗ Uncommitted changes — commit and push first"; \
+		git status -s; \
+		exit 1; \
+	fi
+	@LOCAL_BRANCH=$$(git rev-parse --abbrev-ref HEAD) && \
+	 LOCAL_SHA=$$(git rev-parse HEAD) && \
+	 REMOTE_SHA=$$(git rev-parse origin/$$LOCAL_BRANCH 2>/dev/null || echo "none") && \
+	 if [ "$$LOCAL_SHA" != "$$REMOTE_SHA" ]; then \
+		echo "✗ Branch '$$LOCAL_BRANCH' not pushed — run: git push"; \
+		exit 1; \
+	 fi && \
+	 echo "✓ Branch '$$LOCAL_BRANCH' in sync with origin ($$LOCAL_SHA)"
+	@echo ""
+	@if [ "$(IS_STUDIO)" = "true" ]; then \
+		echo "── Detected: running on Mac Studio (local deploy) ──"; \
+	else \
+		echo "── Detected: remote machine → deploying via SSH to $(STUDIO_HOST) ──"; \
+		ssh -o ConnectTimeout=5 $(STUDIO_HOST) "echo '✓ SSH OK'" || { echo "✗ Cannot reach $(STUDIO_HOST)"; exit 1; }; \
+	fi
+	@echo ""
+	@echo "── Pulling latest ──"
+	@$(call run,git fetch origin && git checkout $$(git rev-parse --abbrev-ref HEAD) && git pull origin $$(git rev-parse --abbrev-ref HEAD))
+	@echo ""
+	@echo "── Building + starting stack (LM_STUDIO_HOST=localhost) ──"
+	@$(call run,LM_STUDIO_HOST=localhost make start)
+	@echo ""
+	@echo "── Post-deploy: container status ──"
+	@$(call run,docker compose ps --format 'table {{.Name}}\t{{.Status}}')
+	@echo ""
+	@echo "✓ Deploy complete ($(if $(filter true,$(IS_STUDIO)),local,via SSH to $(STUDIO_HOST))) — API at http://$(STUDIO_HOST):8004"
+
+deploy-status: ## Check container status on Mac Studio
+	@$(call run,docker compose ps)
+
+deploy-down: ## Stop stack on Mac Studio
+	@$(call run,docker compose down)
+
+deploy-logs: ## Tail logs on Mac Studio
+	@$(call run,docker compose logs -f --tail 50)
+
+# ── Verify deployment ────────────────────────────────────────────────────────
+# Post-deploy verification: checks all services via internal endpoints + SSH.
+# Can run from any machine with SSH access to the Mac Studio.
+
+.PHONY: verify
+
+verify: ## Verify deployment — health checks for all services
+	@PASS=0; FAIL=0; WARN=0; \
+	check() { \
+		if [ "$$2" = "$$3" ]; then \
+			echo "  ✓ $$1"; \
+			PASS=$$((PASS + 1)); \
+		else \
+			echo "  ✗ $$1 (expected $$3, got $$2)"; \
+			FAIL=$$((FAIL + 1)); \
+		fi; \
+	}; \
+	if [ "$(IS_STUDIO)" = "true" ]; then \
+		HOST="localhost"; \
+	else \
+		HOST="$(STUDIO_HOST)"; \
+	fi; \
+	echo "── 1. Service health endpoints ──"; \
+	for pair in "knowledge-api:$$HOST:8001/health" "claude-agent:$$HOST:8004/health" "tidy-mcp:$$HOST:8003/health" "litellm-proxy:$$HOST:4000/health/liveliness"; do \
+		SVC=$${pair%%:*}; URL=$${pair#*:}; \
+		CODE=$$(curl -sf -o /dev/null -w "%{http_code}" "http://$$URL" 2>/dev/null); \
+		check "$$SVC" "$$CODE" "200"; \
+	done; \
+	echo ""; \
+	echo "── 2. Database connectivity ──"; \
+	CODE=$$(curl -sf -o /dev/null -w "%{http_code}" "http://$$HOST:6333/healthz" 2>/dev/null); \
+	check "qdrant" "$$CODE" "200"; \
+	NEO4J=$$(curl -sf -o /dev/null -w "%{http_code}" "http://$$HOST:7474" 2>/dev/null); \
+	check "neo4j" "$$NEO4J" "200"; \
+	PG=$$($(call run,docker compose exec -T postgres pg_isready -q && echo ok || echo fail) 2>/dev/null); \
+	if echo "$$PG" | grep -q "ok"; then \
+		echo "  ✓ postgres"; PASS=$$((PASS + 1)); \
+	else \
+		echo "  ✗ postgres (not ready)"; FAIL=$$((FAIL + 1)); \
+	fi; \
+	echo ""; \
+	echo "── 3. LM Studio (embedding model) ──"; \
+	LMS=$$(curl -sf -o /dev/null -w "%{http_code}" "http://$$HOST:1234/v1/models" 2>/dev/null); \
+	check "lm-studio" "$$LMS" "200"; \
+	echo ""; \
+	echo "── 4. Container status ──"; \
+	if [ "$(IS_STUDIO)" = "true" ] || ssh -o ConnectTimeout=5 $(STUDIO_HOST) "echo ok" >/dev/null 2>&1; then \
+		UNHEALTHY=$$($(call run,docker compose ps) 2>/dev/null \
+			| grep -cE 'Restarting|Exit' || true); \
+		if [ "$$UNHEALTHY" = "0" ]; then \
+			echo "  ✓ All containers running"; PASS=$$((PASS + 1)); \
+		else \
+			echo "  ✗ $$UNHEALTHY container(s) unhealthy"; FAIL=$$((FAIL + 1)); \
+			$(call run,docker compose ps) 2>/dev/null | grep -E 'Restarting|Exit'; \
+		fi; \
+	else \
+		echo "  ⚠ SSH not available — skipping container check"; WARN=$$((WARN + 1)); \
+	fi; \
+	echo ""; \
+	echo "── 5. Observability ──"; \
+	PROM=$$(curl -sf -o /dev/null -w "%{http_code}" "http://$$HOST:9090/-/ready" 2>/dev/null); \
+	check "prometheus" "$$PROM" "200"; \
+	GRAF=$$(curl -sf -o /dev/null -w "%{http_code}" "http://$$HOST:3001/api/health" 2>/dev/null); \
+	check "grafana" "$$GRAF" "200"; \
+	FUSE=$$(curl -sf -o /dev/null -w "%{http_code}" "http://$$HOST:3210/api/public/health" 2>/dev/null); \
+	if [ "$$FUSE" = "200" ]; then \
+		echo "  ✓ langfuse"; PASS=$$((PASS + 1)); \
+	else \
+		echo "  ⚠ langfuse (not running — optional)"; WARN=$$((WARN + 1)); \
+	fi; \
+	echo ""; \
+	echo "── Summary: $$PASS passed, $$FAIL failed, $$WARN skipped ──"; \
+	[ "$$FAIL" = "0" ] && echo "✓ All checks passed" || { echo "✗ $$FAIL check(s) failed"; exit 1; }

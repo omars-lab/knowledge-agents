@@ -1,3 +1,9 @@
+---
+name: run-eval
+description: Execute Claude Agent eval suites or model config sweeps and present results
+user_invocable: true
+---
+
 # /run-eval — Execute eval suites and show reports
 
 Run the Claude Agent eval suite or model config eval sweep and present results.

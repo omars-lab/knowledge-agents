@@ -1,3 +1,9 @@
+---
+name: refresh-auth
+description: Refresh Claude Agent container OAuth tokens from macOS Keychain
+user_invocable: true
+---
+
 # /refresh-auth — Refresh Claude Agent container authentication
 
 Manage Claude CLI authentication for the containerized Claude Agent service.

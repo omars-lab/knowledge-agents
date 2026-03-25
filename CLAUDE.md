@@ -86,6 +86,14 @@ make langfuse-up            # Start Langfuse + ClickHouse + Redis + MinIO
 make langfuse-down          # Stop all Langfuse services
 make langfuse-open          # Open Langfuse UI
 
+# Deploy (Mac Studio or local)
+make deploy                 # Deploy to Mac Studio (or locally if on it)
+make local-deploy           # Deploy locally (LM_STUDIO_HOST=localhost)
+make verify                 # Post-deploy health checks (all services)
+make deploy-status          # Check container status on Mac Studio
+make deploy-down            # Stop stack on Mac Studio
+make deploy-logs            # Tail logs on Mac Studio
+
 # Model config evals (compare summarization models/settings)
 make model-eval             # Run full config sweep (all configs × all test cases)
 make model-eval-config CONFIG="9b"  # Run specific config
@@ -94,6 +102,29 @@ make model-eval-report      # Generate comparison report from latest results
 
 ### Claude Code Skills
 - `/knowledge <query>` — Query notes, build graphs, visualize connections via the Claude Agent
+- `/deploy [local|status|verify|down|logs]` — Deploy the stack to Mac Studio or locally
+
+## Skill Conventions
+
+All skills must follow this structure:
+
+```
+.claude/skills/<skill-name>/SKILL.md
+```
+
+Every `SKILL.md` must include YAML frontmatter:
+
+```yaml
+---
+name: <skill-name>
+description: <one-line description>
+user_invocable: true
+---
+```
+
+- **Directory-based**: Each skill lives in its own directory, not as a flat `.md` file
+- **Frontmatter required**: Without it, the skill won't show a description in the skills list
+- **`user_invocable: true`**: Required for skills invoked via `/<skill-name>`
 
 ## Coding Rules
 

@@ -1,3 +1,9 @@
+---
+name: agent-compare
+description: Side-by-side comparison of the Claude agent and the existing note query agent
+user_invocable: true
+---
+
 # /agent-compare — Compare Claude agent vs existing agent
 
 Side-by-side comparison of the Claude agent and the existing note query agent.

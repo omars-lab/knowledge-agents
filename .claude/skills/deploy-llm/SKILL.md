@@ -1,3 +1,9 @@
+---
+name: deploy-llm
+description: Verify and start LM Studio on Mac Studio for embeddings and local inference
+user_invocable: true
+---
+
 # /deploy-llm — Ensure local LLM hardware is running
 
 Verify and start the local LLM infrastructure (LM Studio on Mac Studio) needed for embeddings and local model inference.

@@ -1,3 +1,9 @@
+---
+name: knowledge
+description: Query NotePlan notes, build knowledge graphs, and visualize connections via the Claude Agent
+user_invocable: true
+---
+
 # /knowledge — Query your notes via the Claude Agent
 
 Ask questions about your NotePlan notes, build knowledge graphs, and visualize connections — all from Claude Code.
@@ -6,6 +12,14 @@ Ask questions about your NotePlan notes, build knowledge graphs, and visualize c
 
 ```
 /knowledge <your question or command>
+```
+
+## Prerequisites
+
+The stack must be running. If not deployed yet, use `/deploy` first. Then ensure the Claude Agent is up:
+
+```bash
+make claude-agent-up && make claude-agent-auth-seed
 ```
 
 ## Workflow

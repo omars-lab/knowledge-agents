@@ -1,3 +1,9 @@
+---
+name: extend-eval
+description: Guide for adding new eval test cases to the Claude Agent eval framework
+user_invocable: true
+---
+
 # /extend-eval — Add eval test cases or datasets
 
 Guide for adding new eval test cases to the Claude Agent eval framework.

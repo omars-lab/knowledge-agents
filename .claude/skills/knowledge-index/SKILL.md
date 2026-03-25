@@ -1,3 +1,9 @@
+---
+name: knowledge-index
+description: Sweep NotePlan files, extract entities/relationships, build knowledge graph in Neo4j
+user_invocable: true
+---
+
 # /knowledge-index — Build a comprehensive knowledge graph from NotePlan files
 
 Systematically sweep through NotePlan files, extract entities and relationships, and build a comprehensive knowledge graph in Neo4j. Tracks which files have been processed via git hashes to support incremental re-indexing.

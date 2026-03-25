@@ -1,3 +1,9 @@
+---
+name: extend-agent
+description: Guide for adding a new @tool() to the Claude Agent MCP server
+user_invocable: true
+---
+
 # /extend-agent — Add a new tool to the Claude Agent
 
 Guide for adding a new @tool() to the Claude Agent MCP server.
