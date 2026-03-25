@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Chat - Bytes of Purpose</title>
+  <link rel="stylesheet" href="chat.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">Sessions</span>
+      <button id="new-chat-btn" class="btn-icon" title="New chat">+</button>
+    </div>
+    <div id="session-list" class="session-list"></div>
+  </aside>
+
+  <!-- Sidebar overlay for mobile -->
+  <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+  <!-- Main chat area -->
+  <main class="chat-main">
+    <header class="chat-header">
+      <button id="menu-btn" class="btn-icon menu-btn" title="Toggle sidebar">&#9776;</button>
+      <span class="header-title">Chat &middot; bytesofpurpose.com</span>
+    </header>
+
+    <div id="messages" class="messages"></div>
+
+    <!-- Error banner -->
+    <div id="error-banner" class="error-banner hidden">
+      <span id="error-text"></span>
+      <button id="error-dismiss" class="btn-icon">&times;</button>
+    </div>
+
+    <!-- Input area -->
+    <form id="chat-form" class="chat-input-area">
+      <textarea
+        id="message-input"
+        class="message-input"
+        placeholder="Ask about your notes..."
+        rows="1"
+        autocomplete="off"
+      ></textarea>
+      <button type="submit" id="send-btn" class="send-btn" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </form>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="chat.js"></script>
+</body>
+</html>

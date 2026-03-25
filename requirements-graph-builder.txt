@@ -33,7 +33,7 @@ qdrant-client>=1.7.0
 # Agents framework (needed for graph builder agent)
 openai-agents==0.5.1
 openai-agents[litellm]==0.5.1
-litellm[proxy]>=1.0.0
+litellm[proxy]==1.82.5  # Pinned: 1.82.7-1.82.8 are compromised (supply chain attack)
 
 # Pydantic for data validation
 pydantic>=2.10.0

@@ -489,6 +489,21 @@ services:
       start_period: 90s
     restart: unless-stopped
 
+  # Chat UI — nginx serving static chat interface
+  chat:
+    image: nginx:alpine
+    volumes:
+      - ./chat:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   prometheus_data:

@@ -86,6 +86,12 @@ make langfuse-up            # Start Langfuse + ClickHouse + Redis + MinIO
 make langfuse-down          # Stop all Langfuse services
 make langfuse-open          # Open Langfuse UI
 
+# Cross-stack networking (private-site integration)
+make cross-network-connect  # Connect all services to private-site network
+make cross-network-check    # Verify all services reachable from Kong
+make chat-connect           # Connect chat UI to private-site network
+make claude-agent-connect   # Connect claude-agent to private-site network
+
 # Deploy (Mac Studio or local)
 make deploy                 # Deploy to Mac Studio (or locally if on it)
 make local-deploy           # Deploy locally (LM_STUDIO_HOST=localhost)
@@ -257,6 +263,7 @@ See [docs/USE_CASES.md](docs/USE_CASES.md) for the complete use-case catalog map
 ## Living Documents
 
 These documents must be kept up to date as features are added or changed:
+- **`docs/ARCHITECTURE.md`** -- Mermaid architecture diagram of all services, containers, networks, and external routing. Update when adding/removing containers, changing networks, or modifying routing (Kong, CF Tunnel)
 - **`docs/USE_CASES.md`** -- When adding a new feature or agent capability, add a use case entry with links to the implementing code, tests, and evals
 - **`docs/GRAPH_SCHEMA.md`** -- When adding node types, relationship types, link resolution rules, or entity properties
 - **`docs/OBSERVABILITY.md`** -- When adding metrics, changing log format, or modifying the observability stack

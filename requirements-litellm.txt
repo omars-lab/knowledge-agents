@@ -2,7 +2,7 @@
 # Minimal dependencies needed for LiteLLM proxy server
 
 # Core LiteLLM proxy server
-litellm[proxy]>=1.0.0
+litellm[proxy]==1.82.5  # Pinned: 1.82.7-1.82.8 are compromised (supply chain attack)
 
 # Prisma for database client (used by LiteLLM for storing API keys, usage, etc.)
 prisma>=0.11.0

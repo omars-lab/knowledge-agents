@@ -767,6 +767,9 @@ deploy: ## Deploy to Mac Studio (or locally if already on Mac Studio)
 	@echo "── Post-deploy: container status ──"
 	@$(call run,docker compose ps --format 'table {{.Name}}\t{{.Status}}')
 	@echo ""
+	@echo "── Post-deploy: cross-network connections ──"
+	@$(call run,make cross-network-connect)
+	@echo ""
 	@echo "✓ Deploy complete ($(if $(filter true,$(IS_STUDIO)),local,via SSH to $(STUDIO_HOST))) — API at http://$(STUDIO_HOST):8004"
 
 deploy-status: ## Check container status on Mac Studio
@@ -807,3 +810,31 @@ langfuse-disconnect: ## Disconnect Langfuse from private-site_internal network
 
 langfuse-check: ## Verify Langfuse is reachable from private-site network
 	@docker exec private-site-mcp-1 python3 -c "import urllib.request; print(urllib.request.urlopen('http://langfuse:3000/api/public/health').read().decode())" 2>/dev/null && echo "✅ Langfuse reachable from private-site" || echo "❌ Langfuse NOT reachable — run: make langfuse-connect"
+
+chat-connect: ## Connect chat UI to private-site_internal network (for Kong routing)
+	@docker network connect --alias chat private-site_internal knowledge-agents-chat-1 2>/dev/null && echo "✅ Chat connected to private-site_internal" || echo "⚠️  Already connected (or container not running)"
+
+chat-disconnect: ## Disconnect chat UI from private-site_internal network
+	@docker network disconnect private-site_internal knowledge-agents-chat-1 2>/dev/null && echo "✅ Chat disconnected" || echo "⚠️  Not connected"
+
+chat-check: ## Verify chat UI is reachable from private-site network
+	@docker exec private-site-kong-1 wget -q --spider http://chat:80/health 2>/dev/null && echo "✅ Chat reachable from private-site" || echo "❌ Chat NOT reachable — run: make chat-connect"
+
+claude-agent-connect: ## Connect claude-agent to private-site_internal network (for Kong routing)
+	@docker network connect --alias claude-agent private-site_internal knowledge-agents-claude-agent-1 2>/dev/null && echo "✅ Claude-agent connected to private-site_internal" || echo "⚠️  Already connected (or container not running)"
+
+claude-agent-disconnect: ## Disconnect claude-agent from private-site_internal network
+	@docker network disconnect private-site_internal knowledge-agents-claude-agent-1 2>/dev/null && echo "✅ Claude-agent disconnected" || echo "⚠️  Not connected"
+
+claude-agent-check: ## Verify claude-agent is reachable from private-site network
+	@docker exec private-site-kong-1 wget -q --spider http://claude-agent:8000/health 2>/dev/null && echo "✅ Claude-agent reachable from private-site" || echo "❌ Claude-agent NOT reachable — run: make claude-agent-connect"
+
+cross-network-connect: ## Connect all services to private-site_internal network
+	@$(MAKE) langfuse-connect
+	@$(MAKE) chat-connect
+	@$(MAKE) claude-agent-connect
+
+cross-network-check: ## Verify all services reachable from private-site network
+	@$(MAKE) langfuse-check
+	@$(MAKE) chat-check
+	@$(MAKE) claude-agent-check

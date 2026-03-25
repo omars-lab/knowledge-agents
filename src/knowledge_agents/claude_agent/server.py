@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from pydantic import BaseModel
@@ -213,6 +214,15 @@ app = FastAPI(
     description="Multi-turn conversational agent for notes and knowledge graphs",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# CORS — allows chat UI on localhost:8080 to call claude-agent on :8004 in local dev.
+# In production, Kong proxies both under the same origin so CORS isn't needed.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type"],
 )
 
 

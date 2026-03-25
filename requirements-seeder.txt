@@ -11,7 +11,7 @@ pydantic-settings>=2.0.0
 # Agents dependencies (needed for graph builder agent)
 openai-agents==0.5.1
 openai-agents[litellm]==0.5.1
-litellm[proxy]>=1.0.0
+litellm[proxy]==1.82.5  # Pinned: 1.82.7-1.82.8 are compromised (supply chain attack)
 
 # Neo4j dependencies for graph database seeding
 neo4j>=5.15.0

@@ -112,6 +112,15 @@ python scripts/render_graph.py \
 /knowledge show me a graph of all entities in the knowledge graph
 ```
 
+## Web UI
+
+The chat UI at `chat.bytesofpurpose.com` provides the same query capabilities with a rich interface:
+- SSE streaming with tool execution indicators
+- Multi-turn conversations with session management
+- Markdown rendering with syntax highlighting
+
+For local access: `http://localhost:8080` (requires `docker compose up -d chat`).
+
 ## Troubleshooting
 
 | Issue | Fix |

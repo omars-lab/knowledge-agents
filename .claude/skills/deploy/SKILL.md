@@ -100,7 +100,7 @@ make verify
 ```
 
 Checks 5 categories:
-1. **Service health** — knowledge-api (:8001), claude-agent (:8004), tidy-mcp (:8003), litellm (:4000)
+1. **Service health** — knowledge-api (:8001), claude-agent (:8004), tidy-mcp (:8003), litellm (:4000), chat (:8080)
 2. **Database connectivity** — Qdrant (:6333), Neo4j (:7474), Postgres
 3. **LM Studio** — embedding model loaded (:1234)
 4. **Container status** — no Restarting/Exit containers
@@ -136,9 +136,9 @@ After deploy and verification, always run:
 # Verify no OOTB credentials are in use
 make check-ootb-secrets
 
-# Reconnect Langfuse to private-site network (lost on container recreate)
-make langfuse-connect
-make langfuse-check
+# Reconnect all services to private-site network (lost on container recreate)
+make cross-network-connect
+make cross-network-check
 ```
 
 Add these to the post-deploy checklist whenever the stack is redeployed.
