@@ -786,3 +786,24 @@ deploy-logs: ## Tail logs on Mac Studio
 
 verify: ## Verify deployment — health checks for all services (runs on target host)
 	@$(call run,bash scripts/verify.sh)
+
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+check-ootb-secrets: ## Check that no OOTB/default credentials are in use
+	@bash scripts/check-ootb-secrets.sh
+
+# =============================================================================
+# CROSS-STACK NETWORKING (private-site integration)
+# =============================================================================
+
+langfuse-connect: ## Connect Langfuse to private-site_internal network (for Kong routing)
+	@docker network connect --alias langfuse private-site_internal knowledge-agents-langfuse-1 2>/dev/null && echo "✅ Langfuse connected to private-site_internal" || echo "⚠️  Already connected (or container not running)"
+
+langfuse-disconnect: ## Disconnect Langfuse from private-site_internal network
+	@docker network disconnect private-site_internal knowledge-agents-langfuse-1 2>/dev/null && echo "✅ Langfuse disconnected" || echo "⚠️  Not connected"
+
+langfuse-check: ## Verify Langfuse is reachable from private-site network
+	@docker exec private-site-mcp-1 python3 -c "import urllib.request; print(urllib.request.urlopen('http://langfuse:3000/api/public/health').read().decode())" 2>/dev/null && echo "✅ Langfuse reachable from private-site" || echo "❌ Langfuse NOT reachable — run: make langfuse-connect"

@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: knowledge_workflow
       POSTGRES_USER: knowledge
-      POSTGRES_PASSWORD: knowledge123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     ports:
       - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
@@ -83,7 +83,7 @@ services:
       - "8001:8000"      # Main service port
       - "8002:8002"      # Metrics port
     environment:
-      - DATABASE_URL=postgresql://knowledge:knowledge123@postgres:5432/knowledge_workflow
+      - DATABASE_URL=postgresql://knowledge:${POSTGRES_PASSWORD:-changeme}@postgres:5432/knowledge_workflow
       - API_HOST=0.0.0.0
       - API_PORT=8000
       - TIDY_MCP_URL=http://tidy-mcp:8000  # URL for tidy-mcp HTTP service
@@ -114,7 +114,7 @@ services:
   #     dockerfile: Dockerfile
   #     target: build
   #   environment:
-  #     - DATABASE_URL=postgresql://knowledge:knowledge123@postgres:5432/knowledge_workflow
+  #     - DATABASE_URL=postgresql://knowledge:${POSTGRES_PASSWORD:-changeme}@postgres:5432/knowledge_workflow
   #     - CANARY_INTERVAL=30  # Run canary every 30 seconds
   #     - CANARY_DEBUG=true  # Enable debug logging for canary
   #   volumes:
@@ -172,7 +172,7 @@ services:
       dockerfile: Dockerfile
       target: build
     environment:
-      - DATABASE_URL=postgresql://knowledge:knowledge123@postgres:5432/knowledge_workflow
+      - DATABASE_URL=postgresql://knowledge:${POSTGRES_PASSWORD:-changeme}@postgres:5432/knowledge_workflow
       - ENVIRONMENT=test
       - TIDY_MCP_URL=http://tidy-mcp:8000  # URL for tidy-mcp HTTP service
     secrets:
@@ -204,7 +204,7 @@ services:
       dockerfile: Dockerfile
       target: seeder
     environment:
-      - DATABASE_URL=postgresql://knowledge:knowledge123@postgres:5432/knowledge_workflow
+      - DATABASE_URL=postgresql://knowledge:${POSTGRES_PASSWORD:-changeme}@postgres:5432/knowledge_workflow
       - ENVIRONMENT=production
     secrets:
       - openai_api_key
@@ -233,13 +233,13 @@ services:
       - "7474:7474"   # Browser UI
       - "7687:7687"   # Bolt protocol
     environment:
-      - NEO4J_AUTH=neo4j/knowledge123
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-changeme}
       - NEO4J_PLUGINS=["apoc"]
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p knowledge123 'RETURN 1'"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -258,7 +258,7 @@ services:
       - CLAUDE_AGENT_QDRANT_PORT=6333
       - CLAUDE_AGENT_NEO4J_URI=bolt://neo4j:7687
       - CLAUDE_AGENT_NEO4J_USERNAME=neo4j
-      - CLAUDE_AGENT_NEO4J_PASSWORD=knowledge123
+      - CLAUDE_AGENT_NEO4J_PASSWORD=${NEO4J_PASSWORD:-changeme}
       - CLAUDE_AGENT_NEO4J_DATABASE=neo4j
       - CLAUDE_AGENT_TIDY_MCP_URL=http://tidy-mcp:8000
       - CLAUDE_AGENT_EMBEDDING_PROVIDER=proxy
@@ -267,8 +267,8 @@ services:
       - CLAUDE_AGENT_NOTEPLAN_DIR=/noteplan
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       # Langfuse tracing (graceful degradation — no-op if Langfuse is down)
-      - LANGFUSE_PUBLIC_KEY=pk-lf-knowledge
-      - LANGFUSE_SECRET_KEY=sk-lf-knowledge
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-changeme}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-changeme}
       - LANGFUSE_HOST=http://langfuse:3000
       # SDK stream close timeout: default 60s kills multi-tool queries (see CLAUDE.md gotcha #3)
       # Set to 30 min — API response times are slow with subscription-tier rate limits
@@ -305,7 +305,7 @@ services:
       dockerfile: Dockerfile
       target: graph-builder
     environment:
-      - DATABASE_URL=postgresql://knowledge:knowledge123@postgres:5432/knowledge_workflow
+      - DATABASE_URL=postgresql://knowledge:${POSTGRES_PASSWORD:-changeme}@postgres:5432/knowledge_workflow
       - ENVIRONMENT=production
       - NEO4J_URI=${NEO4J_URI:-bolt://host.docker.internal:7687}
       - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
@@ -351,7 +351,7 @@ services:
     ports:
       - "3001:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=knowledge123
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
@@ -368,7 +368,7 @@ services:
     environment:
       - CLICKHOUSE_DB=langfuse
       - CLICKHOUSE_USER=clickhouse
-      - CLICKHOUSE_PASSWORD=clickhouse123
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-changeme}
     volumes:
       - langfuse_clickhouse_data:/var/lib/clickhouse
     healthcheck:
@@ -394,7 +394,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=minio
-      - MINIO_ROOT_PASSWORD=minio123456
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-changeme}
     volumes:
       - langfuse_minio_data:/data
     healthcheck:
@@ -411,7 +411,7 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set myminio http://langfuse-minio:9000 minio minio123456;
+      mc alias set myminio http://langfuse-minio:9000 minio ${MINIO_ROOT_PASSWORD:-changeme};
       mc mb myminio/langfuse --ignore-existing;
       exit 0;
       "
@@ -429,11 +429,11 @@ services:
       langfuse-minio:
         condition: service_healthy
     environment: &langfuse-env
-      DATABASE_URL: postgresql://knowledge:knowledge123@postgres:5432/langfuse
+      DATABASE_URL: postgresql://knowledge:${POSTGRES_PASSWORD:-changeme}@postgres:5432/langfuse
       CLICKHOUSE_URL: http://langfuse-clickhouse:8123
-      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:clickhouse123@langfuse-clickhouse:9000/langfuse
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:${CLICKHOUSE_PASSWORD:-changeme}@langfuse-clickhouse:9000/langfuse
       CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse123
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-changeme}
       CLICKHOUSE_CLUSTER_ENABLED: "false"
       REDIS_HOST: langfuse-redis
       REDIS_PORT: "6379"
@@ -441,13 +441,13 @@ services:
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
       LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: minio123456
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-changeme}
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
       LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: minio123456
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-changeme}
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       SALT: langfuse-salt-knowledge-agents
@@ -477,8 +477,8 @@ services:
       LANGFUSE_INIT_ORG_NAME: Knowledge Agents
       LANGFUSE_INIT_PROJECT_ID: knowledge-agents
       LANGFUSE_INIT_PROJECT_NAME: Knowledge Agents
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-knowledge
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-knowledge
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-changeme}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-changeme}
       LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_ADMIN_EMAIL:-admin@localhost.dev}
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:-changeme}
     healthcheck:
