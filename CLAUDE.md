@@ -274,3 +274,24 @@ These documents must be kept up to date as features are added or changed:
 - **NEVER output secret values in conversation.** If you need to reference a secret, describe which env var it is, not its value.
 - When adding new services that need credentials, add the env var to `.env.example` with a `changeme` placeholder and reference it in `docker-compose.yml` via `${VAR:-default}`.
 - Langfuse credentials are in `.env` — the compose file defaults are intentionally insecure placeholders that only work for local dev.
+- **Passwords must be URL-safe** (use `openssl rand -hex N`, not `base64`). Passwords appear in `DATABASE_URL` and `CLICKHOUSE_MIGRATION_URL` connection strings where `/`, `+`, `=` break URL parsing.
+- **`scripts/check-ootb-secrets.sh` intentionally contains OOTB passwords** (`knowledge123`, `minio123456`, etc.) — it's a negative test that verifies these default credentials are rejected by running services. This is not credential exposure.
+- Run `make check-ootb-secrets` after any deploy or credential change to verify no defaults are in use.
+
+## Cross-Stack Networking (private-site integration)
+
+Langfuse is accessible at `https://langfuse.bytesofpurpose.com` via the private-site's Kong + CF Tunnel:
+
+```
+Internet → CF Access (LinkedIn) → CF Tunnel → Kong → langfuse:3000
+```
+
+The Langfuse container joins `private-site_internal` Docker network with alias `langfuse`:
+```bash
+make langfuse-connect    # Connect Langfuse to private-site network
+make langfuse-check      # Verify connectivity
+```
+
+**Critical:** The network connection is lost when the Langfuse container is recreated. Always run `make langfuse-connect` after `docker compose up -d langfuse`.
+
+**Requirement:** Langfuse must have `HOSTNAME: 0.0.0.0` in its environment — Next.js otherwise binds only to its primary network interface and is unreachable from the private-site network.

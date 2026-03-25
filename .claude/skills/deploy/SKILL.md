@@ -127,6 +127,22 @@ See `/refresh-auth` for full auth management details.
 
 ## Troubleshooting
 
+
+### 8. Security and cross-stack checks
+
+After deploy and verification, always run:
+
+```bash
+# Verify no OOTB credentials are in use
+make check-ootb-secrets
+
+# Reconnect Langfuse to private-site network (lost on container recreate)
+make langfuse-connect
+make langfuse-check
+```
+
+Add these to the post-deploy checklist whenever the stack is redeployed.
+
 | Issue | Fix |
 |-------|-----|
 | `Uncommitted changes` | Commit and push first |
