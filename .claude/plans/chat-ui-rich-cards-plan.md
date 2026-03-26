@@ -566,6 +566,170 @@ Expanded (click to expand):
   - Conversation history (input_tokens - system_tokens - tool_tokens)
 - Emit `context_usage` as part of the `result` SSE event
 
+### 8. Ask User Question Widget (`card_type: "ask_user"`)
+
+**Inspiration:** Claude Code's `AskUserQuestion` tool — when the agent needs clarification, it pauses and presents a structured question to the user rather than guessing.
+
+Currently the agent just outputs text questions that blend into the response. This widget makes questions first-class: a distinct visual card with input fields, pre-filled options, and a submit button. The agent pauses streaming until the user responds, then resumes with the answer injected as context.
+
+**Use cases:**
+- Agent finds 3 possible notes matching a query → asks "Which one did you mean?"
+- Agent needs a date range for changelog → asks "What date range?"
+- Agent is about to modify the knowledge graph → asks "Should I proceed?"
+- Agent found ambiguous entity references → asks "Is this the Omar who is a person or the Omar project?"
+
+**Wireframes:**
+
+```
+Multiple choice:
++------------------------------------------------------------------+
+| ? I found 3 notes matching "goals". Which one do you mean?       |
+|                                                                   |
+|   ( ) Goals.md — My 2026 goals include...                        |
+|   ( ) Q2 OKRs.md — Objective 1: Ship...                          |
+|   ( ) Daily Note Mar 25 — Reviewed Q2 goals...                   |
+|   ( ) All of them                                                 |
+|                                                                   |
+|                                              [Skip] [Submit]     |
++------------------------------------------------------------------+
+
+Free text:
++------------------------------------------------------------------+
+| ? What date range should I use for the changelog?                |
+|                                                                   |
+|   [Last 7 days]  [Last 30 days]  [Custom]                        |
+|                                                                   |
+|   Start: [2026-03-17]     End: [2026-03-24]                      |
+|                                                                   |
+|                                              [Skip] [Submit]     |
++------------------------------------------------------------------+
+
+Confirmation:
++------------------------------------------------------------------+
+| ? I'm about to add 12 entities to the knowledge graph from       |
+|   your daily note. This will modify the graph. Proceed?          |
+|                                                                   |
+|                                       [Cancel] [Yes, proceed]    |
++------------------------------------------------------------------+
+```
+
+**SSE event — new type `ask_user`:**
+```json
+{
+  "type": "ask_user",
+  "question_id": "q-abc123",
+  "question": "I found 3 notes matching 'goals'. Which one did you mean?",
+  "input_type": "choice",
+  "options": [
+    {"value": "goals", "label": "Goals.md", "description": "My 2026 goals include..."},
+    {"value": "q2-okrs", "label": "Q2 OKRs.md", "description": "Objective 1: Ship..."},
+    {"value": "daily-0325", "label": "Daily Note Mar 25", "description": "Reviewed Q2 goals..."},
+    {"value": "all", "label": "All of them"}
+  ],
+  "default_value": null,
+  "allow_skip": true
+}
+```
+
+**Input types:**
+
+| `input_type` | Widget | Example |
+|-------------|--------|---------|
+| `choice` | Radio buttons with descriptions | "Which note?" |
+| `multi_choice` | Checkboxes | "Select all that apply" |
+| `text` | Text input field | "What query?" |
+| `date_range` | Two date pickers with presets | "What date range?" |
+| `confirm` | Yes/No buttons | "Proceed with modification?" |
+
+**Frontend behavior:**
+1. Agent streams normally until it emits an `ask_user` event
+2. Streaming pauses — the question card renders in the message area
+3. User interacts with the widget (selects option, types text, clicks confirm)
+4. On submit: answer is sent back to the agent via `POST /api/v1/chat/stream` with the `question_id` and `answer` in the body, plus the existing `session_id`
+5. Agent resumes streaming with the user's answer as context
+
+**Backend changes:**
+- New SSE event type `ask_user` emitted by tools when they need clarification
+- New tool: `ask_user_question(question, input_type, options, default_value, allow_skip)` — available to the agent in its tool list
+- The stream endpoint needs to support "resume after question" — when the next request includes a `question_id` + `answer`, inject the answer into the conversation context and continue
+
+**API contract for answering:**
+```json
+POST /api/v1/chat/stream
+{
+  "message": "",
+  "session_id": "abc",
+  "question_response": {
+    "question_id": "q-abc123",
+    "answer": "goals"
+  }
+}
+```
+
+**CSS:**
+- Question card has a distinct purple-left border and `?` icon
+- Options have hover state, selected state (filled radio/checkbox)
+- Submit button uses accent color, Skip button is dim
+- Card is disabled (grayed out) after submission
+- Confirmation variant: red "Cancel" button, green "Proceed" button
+
+### Cross-Cutting: Widget Anchors + Addressability
+
+Every widget (card, graph, diagram, tool detail, question, context bar) gets a unique HTML anchor ID that is:
+- **Deep-linkable**: `http://localhost:8080/#widget-abc123` scrolls to that widget
+- **Copy-linkable**: hover shows a small link icon; click copies the anchor URL to clipboard
+- **Referenceable in follow-up messages**: user can say "refactor the diagram at #mermaid-abc123" and the agent knows which widget they mean
+
+**Anchor format:** `#widget-{type}-{index}` (e.g., `#widget-mermaid-1`, `#widget-notecard-3`, `#widget-graph-1`)
+
+**Implementation:**
+
+```html
+<!-- Every card/widget wrapper -->
+<div class="card note-card" id="widget-notecard-1">
+  <a class="widget-anchor" href="#widget-notecard-1" title="Copy link">
+    <span class="anchor-icon">#</span>
+  </a>
+  ... card content ...
+</div>
+```
+
+```css
+.widget-anchor {
+  position: absolute; top: 0.4rem; right: 0.4rem;
+  opacity: 0; font-size: 0.7rem; color: var(--text-dim);
+  transition: opacity 0.15s;
+}
+.card:hover .widget-anchor { opacity: 0.5; }
+.widget-anchor:hover { opacity: 1; }
+```
+
+**Frontend behavior:**
+- On page load: if URL has `#widget-*` fragment, scroll to that widget and highlight it briefly
+- Click anchor icon: copy `{current_url}#widget-{id}` to clipboard, show "Copied!" toast
+- In follow-up messages: user references `#widget-mermaid-1` → the agent receives the widget ID, can look up its content (mermaid source, graph data, note path) to act on it
+- Example flow: user says "refactor the diagram at #widget-mermaid-1 to use subgraphs" → agent reads the mermaid source from that widget, modifies it, streams a new mermaid block
+
+**Backend support:**
+- When the user's message contains `#widget-*` references, the chat JS extracts the widget data (mermaid source, graph JSON, note path) and includes it as context in the request body:
+
+```json
+POST /api/v1/chat/stream
+{
+  "message": "refactor the diagram at #widget-mermaid-1 to use subgraphs",
+  "session_id": "abc",
+  "widget_context": [
+    {
+      "widget_id": "widget-mermaid-1",
+      "type": "mermaid",
+      "content": "graph LR\n    Goals[\"Goals\"] -->|HAS_GOAL| ShipChatUI..."
+    }
+  ]
+}
+```
+
+This way the agent has the full content of the referenced widget without needing to re-fetch it.
+
 ## Implementation Phases
 
 ### Phase A: Backend — Structured Tool Returns (2 sessions)
