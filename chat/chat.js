@@ -299,6 +299,7 @@
       case "text":
         ctx.assistantMsg.content += event.content;
         ctx.contentEl.innerHTML = marked.parse(ctx.assistantMsg.content);
+        renderMermaidBlocks(ctx.contentEl);
         scrollToBottom();
         break;
 
@@ -554,6 +555,86 @@
       </div>
     `;
     container.appendChild(el);
+  }
+
+  // ── Mermaid rendering (lazy-loaded) ────────────────────────────────
+  let mermaidLoading = false;
+  let mermaidReady = false;
+
+  async function loadMermaid() {
+    if (mermaidReady || mermaidLoading) return;
+    mermaidLoading = true;
+    console.log("[chat] Loading mermaid.js...");
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
+    script.crossOrigin = "anonymous";
+    script.onload = () => {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: "dark",
+        themeVariables: {
+          darkMode: true,
+          background: "#111118",
+          primaryColor: "#a78bfa",
+          primaryTextColor: "#e2e8f0",
+          primaryBorderColor: "#a78bfa",
+          lineColor: "#64748b",
+          secondaryColor: "#1e1e2e",
+          tertiaryColor: "#1e1e2e",
+        },
+      });
+      mermaidReady = true;
+      mermaidLoading = false;
+      console.log("[chat] mermaid.js ready");
+      // Re-render any pending blocks
+      document.querySelectorAll(".mermaid-pending").forEach(renderOneMermaid);
+    };
+    document.head.appendChild(script);
+  }
+
+  function renderMermaidBlocks(container) {
+    const codeBlocks = container.querySelectorAll("code.language-mermaid");
+    if (codeBlocks.length === 0) return;
+
+    // Lazy-load mermaid on first detection
+    if (!mermaidReady && !mermaidLoading) loadMermaid();
+
+    for (const code of codeBlocks) {
+      const pre = code.parentElement;
+      if (!pre || pre.dataset.mermaid) continue;
+      pre.dataset.mermaid = "true";
+
+      const wrapper = document.createElement("div");
+      wrapper.className = mermaidReady ? "mermaid-wrapper" : "mermaid-wrapper mermaid-pending";
+      wrapper.dataset.source = code.textContent;
+      pre.replaceWith(wrapper);
+
+      if (mermaidReady) {
+        renderOneMermaid(wrapper);
+      } else {
+        // Show placeholder while loading
+        wrapper.innerHTML = '<div class="mermaid-loading">Loading diagram...</div>';
+      }
+    }
+  }
+
+  async function renderOneMermaid(wrapper) {
+    wrapper.classList.remove("mermaid-pending");
+    const source = wrapper.dataset.source;
+    try {
+      const id = "mermaid-" + Math.random().toString(36).slice(2, 8);
+      const { svg } = await window.mermaid.render(id, source);
+      wrapper.innerHTML = svg;
+      wrapper.classList.add("mermaid-rendered");
+    } catch (err) {
+      console.warn("[chat] Mermaid render failed:", err.message);
+      // Fallback: show as code block
+      const pre = document.createElement("pre");
+      const code = document.createElement("code");
+      code.textContent = source;
+      pre.appendChild(code);
+      wrapper.replaceWith(pre);
+    }
   }
 
   // ── Metadata line ─────────────────────────────────────────────────

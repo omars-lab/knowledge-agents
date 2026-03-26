@@ -632,6 +632,28 @@ body {
   margin-left: 0.25rem;
 }
 
+/* ── Mermaid diagrams ─────────────────────────────────────────────────── */
+.mermaid-wrapper {
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.mermaid-wrapper svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-loading {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  padding: 1rem;
+}
+
 /* ── Tool detail block ───────────────────────────────────────────────── */
 .tool-detail {
   background: var(--bg-surface);

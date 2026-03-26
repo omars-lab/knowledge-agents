@@ -278,13 +278,109 @@ def classify_file_path(file_path: str) -> dict | None:
 }
 ```
 
+**Frontend — Two graph widget modes:**
+
+#### Widget A: Entity Highlighter (`card_type: "graph_highlights"`)
+
+Connects response text to knowledge graph concepts. The agent's text response has entity mentions highlighted inline — clicking a highlight opens the Graph Explorer (Widget B) focused on that node.
+
+```
+The [Goals](graph:1) topic links to two active tasks:
+[Ship Chat UI](graph:2) and [Graph Pipeline](graph:6),
+both part of the [Knowledge Agents](graph:3) project.
+```
+
+**SSE payload:**
+```json
+{
+  "card_type": "graph_highlights",
+  "data": {
+    "highlights": [
+      {"text": "Goals", "node_id": "1", "type": "Topic", "color": "#9B59B6"},
+      {"text": "Ship Chat UI", "node_id": "2", "type": "Task", "color": "#E67E22"},
+      {"text": "Knowledge Agents", "node_id": "3", "type": "Project", "color": "#50C878"}
+    ]
+  }
+}
+```
+
 **Frontend:**
-- < 20 nodes: Mermaid diagram (lazy-loaded)
+- Scan the rendered markdown for entity names and wrap them in colored `<span>` tags with underline
+- Pill-style inline badges showing entity type (subtle, like `Goals [Topic]`)
+- On click: scroll to or open the Graph Explorer card, center on that node
+- On hover: tooltip with node properties
+
+#### Widget B: Interactive Graph Explorer (`card_type: "graph"`)
+
+Full dot-viz style visualization — draggable nodes, zoom/pan, labeled edges.
+
+```
++------------------------------------------------------------------+
+| Knowledge Graph: "goals" connections           23 nodes, 31 edges|
+|                                                                   |
+|     [vis-network / d3-force interactive canvas]                   |
+|     - drag nodes to rearrange                                     |
+|     - scroll to zoom                                              |
+|     - click node: properties panel slides in from right           |
+|     - double-click node: re-center graph on that node             |
+|                                                                   |
+| [Mermaid] [Force Graph]                          [Fullscreen]    |
++------------------------------------------------------------------+
+```
+
+- < 20 nodes: Mermaid diagram (already implemented, lazy-loaded)
 - >= 20 nodes: vis-network force graph (interactive, draggable)
 - Toggle button to switch between views
 - Node colors from GRAPH_SCHEMA.md entity type definitions
-- Click node to see properties, click edge to see relationship details
+- **Click node**: side panel slides in showing properties, connected edges, link to source note
+- **Double-click node**: re-queries the graph centered on that node (fetches neighbors via API)
+- **Click edge**: tooltip with relationship type, temporal validity, source episode
 - Fullscreen button for large graphs
+- Physics simulation: spring layout with configurable repulsion
+- Minimap in corner for large graphs
+
+### 2b. Unified Document Explorer (`card_type: "document_explorer"`)
+
+Shows a mixed list of documents from multiple sources (NotePlan, Quip, local files, GitHub) — like a unified search results panel.
+
+```
++------------------------------------------------------------------+
+| Related Documents                              7 results          |
+|                                                                   |
+| [noteplan] Goals.md                                    93%        |
+| [quip]     Q2 OKRs - Engineering Team                 87%        |
+| [file]     src/.../server.py                    Python            |
+| [noteplan] Chat UI Plan.md                             92%        |
+| [quip]     Sprint Retro Notes                          81%        |
+| [github]   knowledge-agents/README.md                  78%        |
+| [noteplan] Daily Note Mar 25                           95%        |
+|                                                                   |
+| Source filter: [All] [NotePlan] [Quip] [Files] [GitHub]          |
++------------------------------------------------------------------+
+```
+
+**SSE payload:**
+```json
+{
+  "card_type": "document_explorer",
+  "data": {
+    "documents": [
+      {"source": "noteplan", "title": "Goals.md", "path": "...", "url": "noteplan://...", "score": 0.93},
+      {"source": "quip", "title": "Q2 OKRs", "path": null, "url": "https://company.quip.com/abc123", "score": 0.87},
+      {"source": "file", "title": "server.py", "path": "src/knowledge_agents/...", "url": "vscode://file/...", "language": "Python"},
+      {"source": "github", "title": "README.md", "path": "knowledge-agents/README.md", "url": "https://github.com/..."}
+    ]
+  }
+}
+```
+
+**Frontend:**
+- Compact list view (one line per document, icon + title + score)
+- Source filter pills at bottom to toggle visibility by source type
+- Click row to open document (uses appropriate URL scheme per source)
+- Hover for preview tooltip
+- Sorted by relevance score (descending)
+- Future: Quip API integration to fetch live title, last editor, preview
 
 ### 3. Link Pills (`card_type: "links"`)
 
