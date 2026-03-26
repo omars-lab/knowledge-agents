@@ -137,7 +137,9 @@ export async function runDemo(handleEvent) {
     }},
 
     // ── Text: graph analysis with mermaid diagram ─────────────────
-    ...tokenize("Here's how your goals connect:\n\n```mermaid\ngraph LR\n    Goals[\"Goals\"] -->|HAS_GOAL| ShipChatUI[\"Ship Chat UI\"]\n    Goals -->|HAS_GOAL| GraphPipeline[\"Graph Pipeline\"]\n    Goals -->|RELATES_TO| Productivity\n    ShipChatUI -->|PART_OF| KnowledgeAgents[\"Knowledge Agents\"]\n    GraphPipeline -->|DEPENDS_ON| Graphiti\n    Omar -->|WORKS_ON| KnowledgeAgents\n    Q2OKRs[\"Q2 OKRs\"] -->|INCLUDES| ShipChatUI\n    Q2OKRs -->|INCLUDES| GraphPipeline\n```\n\nThe **Goals** topic links to two active tasks: **Ship Chat UI** and **Graph Pipeline**, both part of the **Knowledge Agents** project. Your Q2 OKRs reference both tasks.", 80),
+    // Send mermaid block as a single text event to avoid partial parsing
+    { delay: 50, event: { type: "text", content: "Here's how your goals connect:\n\n```mermaid\ngraph LR\n    Goals -->|HAS_GOAL| ShipChatUI[Ship Chat UI]\n    Goals -->|HAS_GOAL| GraphPipeline[Graph Pipeline]\n    Goals -->|RELATES_TO| Productivity\n    ShipChatUI -->|PART_OF| KnowledgeAgents[Knowledge Agents]\n    GraphPipeline -->|DEPENDS_ON| Graphiti\n    Omar -->|WORKS_ON| KnowledgeAgents\n    Q2OKRs[Q2 OKRs] -->|INCLUDES| ShipChatUI\n    Q2OKRs -->|INCLUDES| GraphPipeline\n```\n\n" } },
+    ...tokenize("The **Goals** topic links to two active tasks: **Ship Chat UI** and **Graph Pipeline**, both part of the **Knowledge Agents** project. Your Q2 OKRs reference both tasks.", 40),
 
     // ── Tool 3: derive links → links (all link types) ─────────────
     { delay: 300, event: { type: "tool_start", name: "derive_xcallback_url" } },

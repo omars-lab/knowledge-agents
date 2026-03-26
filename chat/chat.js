@@ -298,6 +298,7 @@
     switch (event.type) {
       case "text":
         ctx.assistantMsg.content += event.content;
+        extractMermaidSources(ctx.assistantMsg.content);
         ctx.contentEl.innerHTML = marked.parse(ctx.assistantMsg.content);
         renderMermaidBlocks(ctx.contentEl);
         scrollToBottom();
@@ -566,7 +567,7 @@
     mermaidLoading = true;
     console.log("[chat] Loading mermaid.js...");
     const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
+    script.src = "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js";
     script.crossOrigin = "anonymous";
     script.onload = () => {
       window.mermaid.initialize({
@@ -588,31 +589,61 @@
       console.log("[chat] mermaid.js ready");
       // Re-render any pending blocks
       document.querySelectorAll(".mermaid-pending").forEach(renderOneMermaid);
+      // Clean up leaked error containers
+      cleanupMermaidErrors();
     };
     document.head.appendChild(script);
   }
 
+  // Debounce mermaid rendering — only process after text stops streaming
+  let mermaidTimer = null;
+
   function renderMermaidBlocks(container) {
+    // Debounce: wait 500ms after last text event to avoid processing
+    // incomplete fenced blocks during streaming
+    if (mermaidTimer) clearTimeout(mermaidTimer);
+    mermaidTimer = setTimeout(() => processMermaidBlocks(container), 500);
+  }
+
+  // Store raw mermaid sources extracted from markdown before HTML parsing
+  const rawMermaidSources = [];
+
+  function extractMermaidSources(rawMarkdown) {
+    const regex = /```mermaid\n([\s\S]*?)```/g;
+    rawMermaidSources.length = 0;
+    let match;
+    while ((match = regex.exec(rawMarkdown)) !== null) {
+      rawMermaidSources.push(match[1].trim());
+    }
+  }
+
+  function processMermaidBlocks(container) {
     const codeBlocks = container.querySelectorAll("code.language-mermaid");
     if (codeBlocks.length === 0) return;
 
-    // Lazy-load mermaid on first detection
-    if (!mermaidReady && !mermaidLoading) loadMermaid();
-
-    for (const code of codeBlocks) {
+    for (let i = 0; i < codeBlocks.length; i++) {
+      const code = codeBlocks[i];
       const pre = code.parentElement;
-      if (!pre || pre.dataset.mermaid) continue;
-      pre.dataset.mermaid = "true";
+      if (!pre) continue;
+
+      // Skip if already replaced with a wrapper
+      if (pre.parentElement && pre.parentElement.querySelector(".mermaid-wrapper")) continue;
+
+      // Use raw source extracted from markdown (avoids HTML encoding issues)
+      const source = rawMermaidSources[i] || code.textContent.trim();
+      if (!source || source.length < 10) continue;
+
+      // Lazy-load mermaid on first detection
+      if (!mermaidReady && !mermaidLoading) loadMermaid();
 
       const wrapper = document.createElement("div");
       wrapper.className = mermaidReady ? "mermaid-wrapper" : "mermaid-wrapper mermaid-pending";
-      wrapper.dataset.source = code.textContent;
+      wrapper.dataset.source = source;
       pre.replaceWith(wrapper);
 
       if (mermaidReady) {
         renderOneMermaid(wrapper);
       } else {
-        // Show placeholder while loading
         wrapper.innerHTML = '<div class="mermaid-loading">Loading diagram...</div>';
       }
     }
@@ -622,19 +653,32 @@
     wrapper.classList.remove("mermaid-pending");
     const source = wrapper.dataset.source;
     try {
+      // Mermaid needs a visible container in the DOM to measure text.
+      // Create a temporary off-screen container for rendering.
+      const tempContainer = document.createElement("div");
+      tempContainer.style.cssText = "position:absolute;left:-9999px;top:-9999px;width:800px;";
+      document.body.appendChild(tempContainer);
+
       const id = "mermaid-" + Math.random().toString(36).slice(2, 8);
-      const { svg } = await window.mermaid.render(id, source);
+      const { svg } = await window.mermaid.render(id, source, tempContainer);
       wrapper.innerHTML = svg;
       wrapper.classList.add("mermaid-rendered");
+      console.log("[chat] Mermaid diagram rendered");
+
+      tempContainer.remove();
     } catch (err) {
       console.warn("[chat] Mermaid render failed:", err.message);
-      // Fallback: show as code block
       const pre = document.createElement("pre");
       const code = document.createElement("code");
       code.textContent = source;
       pre.appendChild(code);
       wrapper.replaceWith(pre);
     }
+    cleanupMermaidErrors();
+  }
+
+  function cleanupMermaidErrors() {
+    document.querySelectorAll("body > div[id^='dmermaid-']").forEach(el => el.remove());
   }
 
   // ── Metadata line ─────────────────────────────────────────────────

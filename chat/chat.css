@@ -654,6 +654,9 @@ body {
   padding: 1rem;
 }
 
+/* Hide mermaid.js error containers that leak into DOM */
+body > div[id^="dmermaid-"] { display: none !important; visibility: hidden !important; height: 0 !important; overflow: hidden !important; }
+
 /* ── Tool detail block ───────────────────────────────────────────────── */
 .tool-detail {
   background: var(--bg-surface);
