@@ -9,6 +9,7 @@
     ? "http://localhost:8004/api/v1"
     : "/api/v1";
   const STORAGE_KEY = "chat_sessions";
+  const DEMO_MODE = new URLSearchParams(window.location.search).has("demo");
 
   // ── DOM refs ─────────────────────────────────────────────────────────
   const sidebar = document.getElementById("sidebar");
@@ -25,7 +26,7 @@
   const errorDismiss = document.getElementById("error-dismiss");
 
   // ── State ────────────────────────────────────────────────────────────
-  let sessions = loadSessions();      // { id, title, messages: [{role, content, tools?, meta?}] }
+  let sessions = loadSessions();
   let activeSessionId = null;
   let streaming = false;
   let abortController = null;
@@ -45,6 +46,12 @@
   renderSessionList();
   if (sessions.length > 0) {
     switchSession(sessions[0].id);
+  }
+
+  // Auto-launch demo mode
+  if (DEMO_MODE) {
+    console.log("[chat] Demo mode activated");
+    launchDemo();
   }
 
   // ── Events ───────────────────────────────────────────────────────────
@@ -73,13 +80,62 @@
   newChatBtn.addEventListener("click", startNewChat);
   errorDismiss.addEventListener("click", hideError);
 
+  // ── Demo mode ──────────────────────────────────────────────────────
+  async function launchDemo() {
+    const demoText = "Show me everything — notes about goals, the knowledge graph, and my changelog";
+    const session = createSession(demoText);
+    activeSessionId = session.id;
+    renderSessionList();
+
+    session.messages.push({ role: "user", content: demoText });
+    renderMessages(session);
+
+    streaming = true;
+    sendBtn.disabled = true;
+
+    const thinkingEl = appendThinking();
+    scrollToBottom();
+
+    const assistantMsg = { role: "assistant", content: "", tools: [], meta: null };
+    session.messages.push(assistantMsg);
+
+    let firstToken = true;
+    let currentToolPills = null;
+    let contentEl = null;
+
+    const ctx = {
+      get firstToken() { return firstToken; },
+      set firstToken(v) { firstToken = v; },
+      get currentToolPills() { return currentToolPills; },
+      set currentToolPills(v) { currentToolPills = v; },
+      get contentEl() { return contentEl; },
+      set contentEl(v) { contentEl = v; },
+      thinkingEl,
+      assistantMsg,
+      session,
+    };
+
+    const { runDemo } = await import("./demo.js");
+    await runDemo(function (event) {
+      handleStreamEvent(event, ctx);
+    });
+
+    // Render metadata
+    if (assistantMsg.meta && ctx.contentEl) {
+      renderMetaLine(assistantMsg.meta, ctx.contentEl.parentElement);
+    }
+
+    saveSessions();
+    streaming = false;
+    sendBtn.disabled = false;
+  }
+
   // ── Submit handler ───────────────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
     const text = messageInput.value.trim();
     if (!text || streaming) return;
 
-    // Create session if needed
     if (!activeSessionId) {
       const session = createSession(text);
       activeSessionId = session.id;
@@ -88,17 +144,14 @@
 
     const session = getSession(activeSessionId);
 
-    // Add user message
     session.messages.push({ role: "user", content: text });
     renderMessages(session);
     saveSessions();
 
-    // Reset input
     messageInput.value = "";
     sendBtn.disabled = true;
     autoResize(messageInput);
 
-    // Stream response
     await streamResponse(session, text);
   }
 
@@ -108,19 +161,29 @@
     sendBtn.disabled = true;
     hideError();
 
-    // Show thinking indicator
     const thinkingEl = appendThinking();
     scrollToBottom();
 
     abortController = new AbortController();
 
-    // Prepare assistant message shell
     const assistantMsg = { role: "assistant", content: "", tools: [], meta: null };
     session.messages.push(assistantMsg);
 
     let firstToken = true;
     let currentToolPills = null;
     let contentEl = null;
+
+    const ctx = {
+      get firstToken() { return firstToken; },
+      set firstToken(v) { firstToken = v; },
+      get currentToolPills() { return currentToolPills; },
+      set currentToolPills(v) { currentToolPills = v; },
+      get contentEl() { return contentEl; },
+      set contentEl(v) { contentEl = v; },
+      thinkingEl,
+      assistantMsg,
+      session,
+    };
 
     const streamUrl = `${API_BASE}/chat/stream`;
     console.log("[chat] POST %s session=%s", streamUrl, session.serverSessionId || "(new)");
@@ -144,9 +207,8 @@
         } else {
           showError(`Server error (${status}). Please try again.`);
         }
-        // Remove assistant + user messages (failed before streaming)
-        session.messages.pop(); // assistant
-        session.messages.pop(); // user
+        session.messages.pop();
+        session.messages.pop();
         messageInput.value = text;
         thinkingEl.remove();
         saveSessions();
@@ -167,7 +229,7 @@
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        buffer = lines.pop(); // keep incomplete line
+        buffer = lines.pop();
 
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
@@ -190,101 +252,319 @@
             console.log("[chat] event: %s %s", event.type, event.name || "");
           }
 
-          // Remove thinking on first real event
-          if (firstToken) {
-            thinkingEl.remove();
-            const msgEl = appendMessageEl("assistant");
-            currentToolPills = msgEl.querySelector(".tool-pills");
-            contentEl = msgEl.querySelector(".message-body");
-            firstToken = false;
-          }
-
-          switch (event.type) {
-            case "text":
-              assistantMsg.content += event.content;
-              contentEl.innerHTML = marked.parse(assistantMsg.content);
-              scrollToBottom();
-              break;
-
-            case "tool_start":
-              assistantMsg.tools.push({ name: event.name, status: "running" });
-              renderToolPills(currentToolPills, assistantMsg.tools);
-              scrollToBottom();
-              break;
-
-            case "tool_complete":
-              // Mark tool as done
-              for (const t of assistantMsg.tools) {
-                if (t.name === event.name && t.status === "running") {
-                  t.status = "done";
-                  break;
-                }
-              }
-              renderToolPills(currentToolPills, assistantMsg.tools);
-              break;
-
-            case "tool_input":
-              // Ignore streaming tool input for now
-              break;
-
-            case "result":
-              session.serverSessionId = event.session_id;
-              assistantMsg.meta = {
-                cost: event.cost_usd,
-                turns: event.turns,
-                session_id: event.session_id,
-              };
-              // Update session title from first assistant reply
-              if (session.messages.filter(m => m.role === "assistant").length === 1) {
-                session.title = assistantMsg.content.slice(0, 60).replace(/\n/g, " ") || session.title;
-                renderSessionList();
-              }
-              break;
-
-            case "error":
-              showError(event.message || "An error occurred during streaming.");
-              break;
-          }
+          handleStreamEvent(event, ctx);
         }
       }
 
-      // Render metadata line
-      if (assistantMsg.meta && contentEl) {
-        const metaEl = document.createElement("div");
-        metaEl.className = "message-meta";
-        const parts = [];
-        if (assistantMsg.meta.cost != null) parts.push(`$${assistantMsg.meta.cost.toFixed(4)}`);
-        if (assistantMsg.meta.turns != null) parts.push(`${assistantMsg.meta.turns} turn${assistantMsg.meta.turns !== 1 ? "s" : ""}`);
-        metaEl.textContent = parts.join(" \u00b7 ");
-        contentEl.parentElement.appendChild(metaEl);
+      if (assistantMsg.meta && ctx.contentEl) {
+        renderMetaLine(assistantMsg.meta, ctx.contentEl.parentElement);
       }
 
     } catch (err) {
       if (err.name === "AbortError") {
         console.log("[chat] Request aborted by user");
-        // User cancelled — remove empty assistant message
         if (!assistantMsg.content) session.messages.pop();
       } else {
         console.error("[chat] Connection error:", err.message);
         showError("Connection lost. Please try again.");
-        // Remove empty assistant message and the user message (never reached server)
         if (!assistantMsg.content) {
-          session.messages.pop(); // assistant
-          session.messages.pop(); // user
+          session.messages.pop();
+          session.messages.pop();
         }
-        // Restore the input so user can retry
         messageInput.value = text;
       }
       thinkingEl.remove();
     }
 
-    // If still showing thinking (e.g. empty response), remove it
-    if (firstToken) thinkingEl.remove();
+    if (ctx.firstToken) thinkingEl.remove();
 
     saveSessions();
     streaming = false;
     sendBtn.disabled = !messageInput.value.trim();
     abortController = null;
+  }
+
+  // ── Shared event handler (used by both SSE stream and demo mode) ────
+  function handleStreamEvent(event, ctx) {
+    // Remove thinking on first real event
+    if (ctx.firstToken) {
+      ctx.thinkingEl.remove();
+      const msgEl = appendMessageEl("assistant");
+      ctx.currentToolPills = msgEl.querySelector(".tool-pills");
+      ctx.contentEl = msgEl.querySelector(".message-body");
+      ctx.firstToken = false;
+    }
+
+    switch (event.type) {
+      case "text":
+        ctx.assistantMsg.content += event.content;
+        ctx.contentEl.innerHTML = marked.parse(ctx.assistantMsg.content);
+        scrollToBottom();
+        break;
+
+      case "tool_start":
+        ctx.assistantMsg.tools.push({ name: event.name, status: "running" });
+        renderToolPills(ctx.currentToolPills, ctx.assistantMsg.tools);
+        scrollToBottom();
+        break;
+
+      case "tool_complete":
+        for (const t of ctx.assistantMsg.tools) {
+          if (t.name === event.name && t.status === "running") {
+            t.status = "done";
+            break;
+          }
+        }
+        renderToolPills(ctx.currentToolPills, ctx.assistantMsg.tools);
+        // Render structured card if present
+        if (event.structured) {
+          renderCard(event.structured, ctx.contentEl.parentElement);
+        }
+        // Render tool detail block if we have duration
+        if (event.duration_ms != null) {
+          renderToolDetail(event, ctx.contentEl.parentElement);
+        }
+        scrollToBottom();
+        break;
+
+      case "tool_input":
+        break;
+
+      case "result":
+        ctx.session.serverSessionId = event.session_id;
+        ctx.assistantMsg.meta = {
+          cost: event.cost_usd,
+          turns: event.turns,
+          session_id: event.session_id,
+        };
+        if (ctx.session.messages.filter(m => m.role === "assistant").length === 1) {
+          ctx.session.title = ctx.assistantMsg.content.slice(0, 60).replace(/\n/g, " ") || ctx.session.title;
+          renderSessionList();
+        }
+        break;
+
+      case "error":
+        showError(event.message || "An error occurred during streaming.");
+        break;
+    }
+  }
+
+  // ── Card renderers ─────────────────────────────────────────────────
+  function renderCard(structured, container) {
+    switch (structured.card_type) {
+      case "note_cards":
+        for (const card of structured.data) {
+          container.appendChild(renderNoteCard(card));
+        }
+        break;
+      case "graph":
+        container.appendChild(renderGraphCard(structured.data));
+        break;
+      case "links":
+        container.appendChild(renderLinkPills(structured.data));
+        break;
+      case "changelog":
+        container.appendChild(renderChangelog(structured.data));
+        break;
+      default:
+        console.warn("[chat] Unknown card_type:", structured.card_type);
+    }
+  }
+
+  // ── Note Card ──────────────────────────────────────────────────────
+  const NOTE_TYPE_CONFIG = {
+    daily:    { icon: "\u{1F4C5}", accent: "#38bdf8", label: "Daily Note" },
+    weekly:   { icon: "\u{1F4C6}", accent: "#818cf8", label: "Weekly Note" },
+    plan:     { icon: "\u{1F3AF}", accent: "#f59e0b", label: "Plan" },
+    template: { icon: "\u{1F4CB}", accent: "#a78bfa", label: "Template" },
+    project:  { icon: "\u{1F4C1}", accent: "#50C878", label: "Project" },
+    quip:     { icon: "\u{1F4DD}", accent: "#F2A93B", label: "Quip Doc" },
+    file:     { icon: "\u{1F4BB}", accent: "#64748b", label: "File" },
+    note:     { icon: "\u{1F5D2}", accent: "#64748b", label: "Note" },
+  };
+
+  function renderNoteCard(card) {
+    const cfg = NOTE_TYPE_CONFIG[card.note_type] || NOTE_TYPE_CONFIG.note;
+    const el = document.createElement("div");
+    el.className = "card note-card";
+    el.style.borderLeftColor = cfg.accent;
+
+    // Action button
+    let actionBtn = "";
+    if (card.note_type === "quip" && card.quip_url) {
+      actionBtn = `<a href="${escapeAttr(card.quip_url)}" target="_blank" rel="noopener" class="card-action card-action--quip">Open in Quip</a>`;
+    } else if (card.note_type === "file" && card.vscode_url) {
+      actionBtn = `<a href="${escapeAttr(card.vscode_url)}" class="card-action card-action--vscode">Open in VS Code</a>`;
+    } else if (card.xcallback_url) {
+      actionBtn = `<a href="${escapeAttr(card.xcallback_url)}" class="card-action card-action--noteplan">Open in NotePlan</a>`;
+    }
+
+    // Similarity badge
+    const simBadge = card.similarity_score != null
+      ? `<span class="card-badge" style="background:${similarityColor(card.similarity_score)}">${Math.round(card.similarity_score * 100)}%</span>`
+      : "";
+
+    // Status/type badge
+    const typeBadge = card.note_type === "template"
+      ? '<span class="card-badge card-badge--dim">Template</span>'
+      : card.language
+        ? `<span class="card-badge card-badge--dim">${escapeHtml(card.language)}</span>`
+        : "";
+
+    // Task stats
+    const taskBar = card.task_stats
+      ? `<div class="card-tasks"><div class="card-tasks-bar"><div class="card-tasks-fill" style="width:${Math.round((card.task_stats.done / card.task_stats.total) * 100)}%"></div></div><span class="card-tasks-label">${card.task_stats.done}/${card.task_stats.total} tasks</span></div>`
+      : "";
+
+    // Modified date
+    const modDate = card.modified_at && card.note_type !== "template"
+      ? `<span class="card-date">${formatDate(card.modified_at)}</span>`
+      : "";
+
+    // Folder breadcrumb
+    const folder = card.folder && card.note_type === "note"
+      ? `<span class="card-folder">${escapeHtml(card.folder)} &rsaquo; </span>`
+      : card.folder && card.note_type === "file"
+        ? `<span class="card-folder">${escapeHtml(card.folder)}/</span>`
+        : "";
+
+    el.innerHTML = `
+      <div class="card-header">
+        <span class="card-icon">${cfg.icon}</span>
+        <span class="card-title">${folder}${escapeHtml(card.title)}</span>
+        ${simBadge}${typeBadge}
+      </div>
+      <div class="card-preview">${escapeHtml(card.preview || "")}</div>
+      ${taskBar}
+      <div class="card-footer">
+        ${actionBtn}
+        ${modDate}
+      </div>
+    `;
+    return el;
+  }
+
+  function similarityColor(score) {
+    const r = Math.round(255 * (1 - score));
+    const g = Math.round(200 * score);
+    return `rgba(${r}, ${g}, 80, 0.2)`;
+  }
+
+  // ── Graph Card (stub — renders node/edge count, placeholder for mermaid/vis-network) ──
+  function renderGraphCard(data) {
+    const el = document.createElement("div");
+    el.className = "card graph-card";
+
+    const nodeCount = data.nodes ? data.nodes.length : 0;
+    const edgeCount = data.edges ? data.edges.length : 0;
+
+    // Render a simple node list for now (Phase B will add mermaid/vis-network)
+    const nodeList = (data.nodes || []).map(n => {
+      return `<span class="graph-node" style="background:${n.color || '#666'}22;border-color:${n.color || '#666'}">${escapeHtml(n.name)}<span class="graph-node-type">${escapeHtml(n.type)}</span></span>`;
+    }).join("");
+
+    const edgeList = (data.edges || []).slice(0, 10).map(e => {
+      const src = (data.nodes || []).find(n => n.id === e.source);
+      const tgt = (data.nodes || []).find(n => n.id === e.target);
+      return `<span class="graph-edge">${escapeHtml(src?.name || e.source)} <span class="graph-edge-label">${escapeHtml(e.label)}</span> ${escapeHtml(tgt?.name || e.target)}</span>`;
+    }).join("");
+
+    el.innerHTML = `
+      <div class="card-header">
+        <span class="card-icon">\u{1F578}</span>
+        <span class="card-title">Knowledge Graph</span>
+        <span class="card-badge card-badge--dim">${nodeCount} nodes \u00b7 ${edgeCount} edges</span>
+      </div>
+      <div class="graph-nodes">${nodeList}</div>
+      <div class="graph-edges">${edgeList}</div>
+    `;
+    return el;
+  }
+
+  // ── Link Pills ────────────────────────────────────────────────────
+  const LINK_TYPE_CONFIG = {
+    noteplan: { color: "#38bdf8", icon: "\u{1F4F1}", label: "app" },
+    quip:     { color: "#F2A93B", icon: "\u{1F4DD}", label: "browser" },
+    vscode:   { color: "#007ACC", icon: "\u{1F4BB}", label: "app" },
+    github:   { color: "#8b949e", icon: "\u{1F419}", label: "browser" },
+    email:    { color: "#34d399", icon: "\u{2709}", label: "app" },
+    location: { color: "#f87171", icon: "\u{1F4CD}", label: "browser" },
+    web:      { color: "#a78bfa", icon: "\u{1F310}", label: "browser" },
+  };
+
+  function renderLinkPills(links) {
+    const el = document.createElement("div");
+    el.className = "link-pills";
+    el.innerHTML = links.map(link => {
+      const cfg = LINK_TYPE_CONFIG[link.type] || LINK_TYPE_CONFIG.web;
+      const target = cfg.label === "browser" ? ' target="_blank" rel="noopener"' : "";
+      return `<a href="${escapeAttr(link.url)}" class="link-pill" style="--pill-color:${cfg.color}"${target}>${cfg.icon} ${escapeHtml(link.label)}<span class="link-pill-hint">${cfg.label}</span></a>`;
+    }).join("");
+    return el;
+  }
+
+  // ── Changelog Timeline ────────────────────────────────────────────
+  const CHANGELOG_ACTIONS = {
+    new:     { color: "#34d399", icon: "+" },
+    updated: { color: "#38bdf8", icon: "\u2191" },
+    deleted: { color: "#f87171", icon: "\u2212" },
+  };
+
+  function renderChangelog(data) {
+    const el = document.createElement("div");
+    el.className = "card changelog-card";
+
+    let currentDate = "";
+    const entriesHtml = (data.entries || []).map(entry => {
+      const cfg = CHANGELOG_ACTIONS[entry.action] || CHANGELOG_ACTIONS.updated;
+      let dateHeader = "";
+      if (entry.date !== currentDate) {
+        currentDate = entry.date;
+        dateHeader = `<div class="changelog-date">${formatDate(entry.date)}</div>`;
+      }
+      return `${dateHeader}<div class="changelog-entry"><span class="changelog-dot" style="background:${cfg.color}">${cfg.icon}</span><span class="changelog-summary">${escapeHtml(entry.summary)}</span>${entry.detail ? `<span class="changelog-detail">${escapeHtml(entry.detail)}</span>` : ""}</div>`;
+    }).join("");
+
+    el.innerHTML = `
+      <div class="card-header">
+        <span class="card-icon">\u{1F4C8}</span>
+        <span class="card-title">Changelog: ${escapeHtml(data.start_date)} \u2192 ${escapeHtml(data.end_date)}</span>
+      </div>
+      <div class="changelog-timeline">${entriesHtml}</div>
+    `;
+    return el;
+  }
+
+  // ── Tool Detail Block ─────────────────────────────────────────────
+  function renderToolDetail(event, container) {
+    const el = document.createElement("div");
+    el.className = "tool-detail collapsed";
+
+    const durationSec = (event.duration_ms / 1000).toFixed(1);
+
+    el.innerHTML = `
+      <div class="tool-detail-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <span class="tool-detail-chevron">\u25B6</span>
+        <span class="tool-detail-name">${escapeHtml(event.name)}</span>
+        <span class="tool-detail-duration">${durationSec}s</span>
+      </div>
+      <div class="tool-detail-body">
+        <div class="tool-detail-row"><span class="tool-detail-label">Input</span><pre class="tool-detail-json">${escapeHtml(event.input || "")}</pre></div>
+        ${event.output_text ? `<div class="tool-detail-row"><span class="tool-detail-label">Output</span><pre class="tool-detail-json">${escapeHtml(event.output_text.slice(0, 500))}</pre></div>` : ""}
+      </div>
+    `;
+    container.appendChild(el);
+  }
+
+  // ── Metadata line ─────────────────────────────────────────────────
+  function renderMetaLine(meta, container) {
+    const metaEl = document.createElement("div");
+    metaEl.className = "message-meta";
+    const parts = [];
+    if (meta.cost != null) parts.push(`$${meta.cost.toFixed(4)}`);
+    if (meta.turns != null) parts.push(`${meta.turns} turn${meta.turns !== 1 ? "s" : ""}`);
+    metaEl.textContent = parts.join(" \u00b7 ");
+    container.appendChild(metaEl);
   }
 
   // ── DOM helpers ──────────────────────────────────────────────────────
@@ -338,13 +618,7 @@
           renderToolPills(pills, msg.tools);
         }
         if (msg.meta) {
-          const metaEl = document.createElement("div");
-          metaEl.className = "message-meta";
-          const parts = [];
-          if (msg.meta.cost != null) parts.push(`$${msg.meta.cost.toFixed(4)}`);
-          if (msg.meta.turns != null) parts.push(`${msg.meta.turns} turn${msg.meta.turns !== 1 ? "s" : ""}`);
-          metaEl.textContent = parts.join(" \u00b7 ");
-          el.appendChild(metaEl);
+          renderMetaLine(msg.meta, el);
         }
       }
     }
@@ -433,7 +707,6 @@
       )
       .join("");
 
-    // Attach click handlers
     for (const el of sessionList.querySelectorAll(".session-item")) {
       el.addEventListener("click", function (e) {
         if (e.target.closest(".session-delete")) return;
@@ -452,7 +725,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
     } catch {
-      // localStorage full or unavailable — silent fail
+      // localStorage full or unavailable
     }
   }
 
@@ -470,5 +743,18 @@
     const div = document.createElement("div");
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function formatDate(dateStr) {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return dateStr;
+    }
   }
 })();
