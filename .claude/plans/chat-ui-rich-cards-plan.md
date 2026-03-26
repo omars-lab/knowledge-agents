@@ -489,6 +489,83 @@ Shows a mixed list of documents from multiple sources (NotePlan, Quip, local fil
 
 **Frontend:** Vertical timeline with colored dots by action type (green=new, blue=updated, red=deleted). Dates as section headers. Expandable detail on each entry.
 
+### 7. Context Consumption Bar (`card_type: "context_usage"`)
+
+**Source:** Enhanced `result` SSE event — emitted once per turn at the end.
+
+Shows how much of the model's context window was consumed, broken down by category. Rendered after every assistant turn, below the metadata line.
+
+```
+Collapsed (default):
++------------------------------------------------------------------+
+| [||||||||||||||||||||       ] 62% context used     $0.0349 · 2 turns |
++------------------------------------------------------------------+
+
+Expanded (click to expand):
++------------------------------------------------------------------+
+| Context Window Usage                          62% of 200K tokens |
+|                                                                   |
+| [system |||][tools ||||||||][history ||||][response ||][free     ]|
+|                                                                   |
+| System prompt     12,400 tokens   6%   ████░░░░░░░░░░░░░░░░░░    |
+| Tool calls        48,200 tokens  24%   ████████████░░░░░░░░░░░   |
+|   semantic_search    18,400                                       |
+|   query_knowledge_graph 22,100                                    |
+|   derive_xcallback_url   3,200                                    |
+|   knowledge_changelog    4,500                                    |
+| Conversation history 31,800 tokens  16%  ████████░░░░░░░░░░░░░    |
+| Response           32,600 tokens  16%   ████████░░░░░░░░░░░░░    |
+| Free               75,000 tokens  38%                             |
+|                                                                   |
+| Total: 124,000 / 200,000 tokens                                  |
++------------------------------------------------------------------+
+```
+
+**SSE payload** (added to the existing `result` event):
+```json
+{
+  "type": "result",
+  "session_id": "abc",
+  "cost_usd": 0.0349,
+  "turns": 2,
+  "duration_ms": 8500,
+  "context_usage": {
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 200000,
+    "system_tokens": 12400,
+    "tool_tokens": 48200,
+    "tool_breakdown": [
+      {"name": "semantic_search", "tokens": 18400},
+      {"name": "query_knowledge_graph", "tokens": 22100},
+      {"name": "derive_xcallback_url", "tokens": 3200},
+      {"name": "knowledge_changelog", "tokens": 4500}
+    ],
+    "history_tokens": 31800,
+    "response_tokens": 32600,
+    "total_tokens": 124000
+  }
+}
+```
+
+**Frontend:**
+- **Collapsed**: single-line stacked bar (colored segments) + percentage + cost/turns metadata. Always shown after every turn.
+- **Expanded** (click): full breakdown table with per-category bars and per-tool drill-down.
+- Color scheme:
+  - System prompt: `#64748b` (slate)
+  - Tool calls: `#38bdf8` (blue)
+  - Conversation history: `#a78bfa` (purple)
+  - Response: `#34d399` (green)
+  - Free: `rgba(255,255,255,0.05)` (dim)
+- **Warning state**: bar turns amber at >80% usage, red at >95% — signals the conversation is approaching context limits.
+- **Per-tool breakdown**: expandable sub-rows showing which tools consumed the most context. Helps debug "why is this conversation so expensive?"
+
+**Backend changes needed:**
+- The Claude SDK's `ResultMessage` includes `usage` with `input_tokens` and `output_tokens`. We need to also track:
+  - System prompt size (static, computed once at startup)
+  - Per-tool I/O token counts (sum from `tool_complete` events)
+  - Conversation history (input_tokens - system_tokens - tool_tokens)
+- Emit `context_usage` as part of the `result` SSE event
+
 ## Implementation Phases
 
 ### Phase A: Backend — Structured Tool Returns (2 sessions)
