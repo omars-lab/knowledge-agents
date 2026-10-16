@@ -4,8 +4,11 @@
 
   // ── Configuration ────────────────────────────────────────────────────
   // In production, Kong routes /api -> claude-agent:8000 (same origin).
-  // In local dev (port 8080), nginx serves UI only — talk to claude-agent directly.
-  const API_BASE = window.location.port === "8080"
+  // In local dev (localhost:7128, or knowledge-agents.localhost through the hubs
+  // router), nginx serves UI only — talk to claude-agent directly.
+  const HOST = window.location.hostname;
+  const LOCAL_DEV = HOST === "localhost" || HOST === "127.0.0.1" || HOST.endsWith(".localhost");
+  const API_BASE = LOCAL_DEV
     ? "http://localhost:8004/api/v1"
     : "/api/v1";
   const STORAGE_KEY = "chat_sessions";

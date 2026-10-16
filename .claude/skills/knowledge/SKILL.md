@@ -119,7 +119,7 @@ The chat UI at `chat.bytesofpurpose.com` provides the same query capabilities wi
 - Multi-turn conversations with session management
 - Markdown rendering with syntax highlighting
 
-For local access: `http://localhost:8080` (requires `docker compose up -d chat`).
+For local access: `http://localhost:7128` (requires `docker compose up -d chat`).
 
 ## Troubleshooting
 

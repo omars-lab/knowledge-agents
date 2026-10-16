@@ -100,7 +100,7 @@ make verify
 ```
 
 Checks 5 categories:
-1. **Service health** — knowledge-api (:8001), claude-agent (:8004), tidy-mcp (:8003), litellm (:4000), chat (:8080)
+1. **Service health** — knowledge-api (:8001), claude-agent (:8004), tidy-mcp (:8003), litellm (:4000), chat (:7128)
 2. **Database connectivity** — Qdrant (:6333), Neo4j (:7474), Postgres
 3. **LM Studio** — embedding model loaded (:1234)
 4. **Container status** — no Restarting/Exit containers

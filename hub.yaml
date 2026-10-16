@@ -1,9 +1,9 @@
-# How this repo shows on the local launcher (~/Workspace/git/hubs). Phase 1: today's ports.
+# How this repo shows on the local launcher (~/Workspace/git/hubs).
 # Check it with `uv run ~/Workspace/git/hubs/launcher/check.py --repo .`
 
 runners:
   - id: knowledge-agents
-    port: 8080                    # the chat page (nginx); moves to 7128 in Phase 2
+    port: 7128                    # the chat page (nginx), from the hubs port plan
     other_ports:                  # everything else `make start` brings up from docker-compose.yml
       - 8004                      # claude-agent, the API the chat page calls
       - 8001                      # agentic-api
@@ -32,6 +32,6 @@ hubs:
     visibility: private
     use: local
     local: { runner: knowledge-agents }
-    # The page calls its API at localhost:8004 only when it is opened on port 8080, so open it at
-    # http://localhost:8080/; through the router (port 7100) it calls /api/v1 on the same address instead.
+    # Opened on this Mac (localhost:7128 or knowledge-agents.localhost through the router), the page
+    # calls its API at localhost:8004; anywhere else it calls /api/v1 on the same address (Kong).
     # The Mac Studio runs this stack too (`make deploy`, hosts.yml); add a lan: copy once its address is checked.

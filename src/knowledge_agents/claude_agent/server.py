@@ -216,11 +216,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allows chat UI on localhost:8080 to call claude-agent on :8004 in local dev.
+# CORS — allows chat UI on localhost:7128 (or knowledge-agents.localhost, through the hubs
+# router on port 80 or 7100) to call claude-agent on :8004 in local dev.
 # In production, Kong proxies both under the same origin so CORS isn't needed.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],
+    allow_origins=[
+        "http://localhost:7128",
+        "http://127.0.0.1:7128",
+        "http://knowledge-agents.localhost",
+        "http://knowledge-agents.localhost:7100",
+    ],
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type"],
 )
