@@ -724,6 +724,13 @@ IS_STUDIO := $(shell \
 		hostname | grep -qi "mac-studio" && echo true || echo false; \
 	fi)
 
+# Which address docker-compose.yml publishes every port on. A laptop keeps the stack to itself
+# (127.0.0.1); the Mac Studio serves other machines (0.0.0.0). `make deploy` from the MacBook runs
+# `make start` on the Studio over SSH, so the Studio's own detection picks 0.0.0.0 there.
+# Override with BIND_ADDRESS=... make start.
+BIND_ADDRESS ?= $(if $(filter true,$(IS_STUDIO)),0.0.0.0,127.0.0.1)
+export BIND_ADDRESS
+
 # Helper: run a command locally or via SSH depending on IS_STUDIO
 run = $(if $(filter true,$(IS_STUDIO)),cd $(STUDIO_PATH) && $(1),ssh $(STUDIO_HOST) "zsh -l -c 'cd $(STUDIO_PATH) && $(1)'")
 
