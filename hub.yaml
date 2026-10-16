@@ -1,0 +1,37 @@
+# How this repo shows on the local launcher (~/Workspace/git/hubs). Phase 1: today's ports.
+# Check it with `uv run ~/Workspace/git/hubs/launcher/check.py --repo .`
+
+runners:
+  - id: knowledge-agents
+    port: 8080                    # the chat page (nginx); moves to 7128 in Phase 2
+    other_ports:                  # everything else `make start` brings up from docker-compose.yml
+      - 8004                      # claude-agent, the API the chat page calls
+      - 8001                      # agentic-api
+      - 8002                      # agentic-api metrics
+      - 8003                      # tidy-mcp
+      - 4000                      # LiteLLM proxy
+      - 3210                      # Langfuse
+      - 7474                      # Neo4j browser
+      - 7687                      # Neo4j Bolt
+      - 9090                      # Prometheus
+      - 6333                      # Qdrant HTTP
+      - 6334                      # Qdrant gRPC
+      - 3100                      # Loki
+      - 3002                      # Grafana (GRAFANA_HOST_PORT)
+      - 5432                      # Postgres (POSTGRES_HOST_PORT)
+    health: /health
+    runs_under: docker
+    start: make start             # builds the images, then `docker compose up -d`
+    stop: make stop
+    logs: { command: docker compose logs --no-color --tail 200 chat claude-agent agentic-api }   # the chat page and the two APIs it calls
+
+hubs:
+  - id: knowledge-agents-chat
+    name: Knowledge-agents chat
+    description: Ask questions of your NotePlan notes; answers come from search over the notes and a knowledge graph.
+    visibility: private
+    use: local
+    local: { runner: knowledge-agents }
+    # The page calls its API at localhost:8004 only when it is opened on port 8080, so open it at
+    # http://localhost:8080/; through the router (port 7100) it calls /api/v1 on the same address instead.
+    # The Mac Studio runs this stack too (`make deploy`, hosts.yml); add a lan: copy once its address is checked.
