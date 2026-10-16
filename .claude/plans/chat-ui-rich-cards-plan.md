@@ -676,7 +676,7 @@ POST /api/v1/chat/stream
 ### Cross-Cutting: Widget Anchors + Addressability
 
 Every widget (card, graph, diagram, tool detail, question, context bar) gets a unique HTML anchor ID that is:
-- **Deep-linkable**: `http://localhost:8080/#widget-abc123` scrolls to that widget
+- **Deep-linkable**: `http://localhost:7128/#widget-abc123` scrolls to that widget
 - **Copy-linkable**: hover shows a small link icon; click copies the anchor URL to clipboard
 - **Referenceable in follow-up messages**: user can say "refactor the diagram at #mermaid-abc123" and the agent knows which widget they mean
 
@@ -886,7 +886,7 @@ rate_limit     → {"type": "rate_limit", "status": "...", "utilization": 0.95}
 
 ### Demo Mode — Sample Conversation with All Card Types
 
-A hardcoded demo conversation that exercises every card type, available at `http://localhost:8080/?demo=true`. This enables:
+A hardcoded demo conversation that exercises every card type, available at `http://localhost:7128/?demo=true`. This enables:
 - Frontend development without running the agent stack
 - Visual regression testing of all card types
 - Browser-based verification via Chrome DevTools
@@ -962,7 +962,7 @@ if (DEMO_MODE) {
 
 **Test workflow:**
 1. `docker compose up -d chat` (only nginx needed)
-2. Open `http://localhost:8080/?demo=true`
+2. Open `http://localhost:7128/?demo=true`
 3. All card types render in sequence with simulated streaming
 4. Screenshot each card type for visual regression baseline
 5. Compare after CSS/JS changes

@@ -1,6 +1,6 @@
 /* ── Demo Mode ────────────────────────────────────────────────────────── */
 /* Replays a mock SSE conversation exercising every card type.           */
-/* Activate: http://localhost:8080/?demo=true                            */
+/* Activate: http://localhost:7128/?demo=true                            */
 
 export async function runDemo(handleEvent) {
   const events = [

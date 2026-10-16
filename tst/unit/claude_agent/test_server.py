@@ -187,3 +187,55 @@ class TestSessionEndpoints:
             response = client.get("/api/v1/sessions/nonexistent/artifacts")
 
         assert response.status_code == 404
+
+
+@pytest.mark.unit
+class TestCors:
+    """The chat page calls this server from another port in local dev, so CORS must allow it."""
+
+    @pytest.mark.parametrize(
+        "origin",
+        [
+            "http://localhost:7128",
+            "http://127.0.0.1:7128",
+            "http://knowledge-agents.localhost",
+            "http://knowledge-agents.localhost:7100",
+        ],
+    )
+    def test_chat_page_origins_allowed(self, origin):
+        """Preflight from the chat page, opened directly or through the hubs router, is allowed."""
+        from knowledge_agents.claude_agent.server import app
+
+        with patch(
+            "knowledge_agents.claude_agent.server.init_tool_clients"
+        ), patch("knowledge_agents.claude_agent.server.close_tool_clients"):
+            client = TestClient(app)
+            response = client.options(
+                "/api/v1/chat/stream",
+                headers={
+                    "Origin": origin,
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "Content-Type",
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") == origin
+
+    def test_other_origin_refused(self):
+        """The old port 8080 and unrelated pages are not allowed."""
+        from knowledge_agents.claude_agent.server import app
+
+        with patch(
+            "knowledge_agents.claude_agent.server.init_tool_clients"
+        ), patch("knowledge_agents.claude_agent.server.close_tool_clients"):
+            client = TestClient(app)
+            response = client.options(
+                "/api/v1/chat/stream",
+                headers={
+                    "Origin": "http://localhost:8080",
+                    "Access-Control-Request-Method": "POST",
+                },
+            )
+
+        assert "access-control-allow-origin" not in response.headers

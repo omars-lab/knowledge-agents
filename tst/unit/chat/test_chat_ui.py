@@ -24,7 +24,7 @@ import os
 import pytest
 import requests
 
-CHAT_URL = os.getenv("CHAT_URL", "http://localhost:8080")
+CHAT_URL = os.getenv("CHAT_URL", "http://localhost:7128")
 AGENT_URL = os.getenv("CLAUDE_AGENT_URL", "http://localhost:8004")
 
 
@@ -189,21 +189,27 @@ class TestAgentConnection:
         data = response.json()
         assert data["status"] == "healthy"
 
-    def test_agent_cors_preflight(self):
-        """CORS preflight from chat UI origin should be allowed."""
+    @pytest.mark.parametrize(
+        "origin",
+        [
+            "http://localhost:7128",
+            "http://knowledge-agents.localhost",
+            "http://knowledge-agents.localhost:7100",
+        ],
+    )
+    def test_agent_cors_preflight(self, origin):
+        """CORS preflight from the chat UI's origins (direct and through the hubs router) should be allowed."""
         response = requests.options(
             f"{AGENT_URL}/api/v1/chat/stream",
             headers={
-                "Origin": "http://localhost:8080",
+                "Origin": origin,
                 "Access-Control-Request-Method": "POST",
                 "Access-Control-Request-Headers": "Content-Type",
             },
             timeout=5,
         )
         assert response.status_code == 200
-        assert "http://localhost:8080" in response.headers.get(
-            "Access-Control-Allow-Origin", ""
-        )
+        assert origin in response.headers.get("Access-Control-Allow-Origin", "")
 
     def test_agent_stream_endpoint_rejects_get(self):
         """Stream endpoint should reject GET (only POST allowed)."""
@@ -238,9 +244,9 @@ class TestAgentConnection:
         assert isinstance(data["sessions"], list)
 
     def test_js_api_base_targets_agent_in_dev(self):
-        """chat.js should point to claude-agent:8004 when served from port 8080."""
+        """chat.js should point to claude-agent:8004 when opened on localhost or a *.localhost name."""
         response = requests.get(f"{CHAT_URL}/chat.js", timeout=5)
         assert response.status_code == 200
         # Verify the dev-mode API base URL detection logic exists
         assert "localhost:8004" in response.text
-        assert 'window.location.port === "8080"' in response.text
+        assert 'HOST.endsWith(".localhost")' in response.text
