@@ -204,6 +204,8 @@ When discovering non-obvious gotchas, limitations, or workarounds during impleme
 
 18. **Graphiti uses `Entity` label which conflicts with our old pipeline.** Old entities (without `group_id`) cause `ConstraintValidationFailed` on name uniqueness. Fix: clean old entities before Graphiti ingestion, or use `group_id` partitioning.
 
+19. **Ports are published on `BIND_ADDRESS`: 127.0.0.1 on a laptop, 0.0.0.0 on the Mac Studio.** The Makefile picks it from `hosts.yml` (`role: prod` → 0.0.0.0) and exports it to `docker compose`. So on the MacBook nothing in the stack is reachable from the network. A bare `docker compose up` on the Studio, without make, falls back to 127.0.0.1; set `BIND_ADDRESS=0.0.0.0` in the Studio's `.env` if that ever matters. Containers still reach published ports through `host.docker.internal`, and the Loki log driver still reaches `localhost:3100` (both checked on Docker Desktop, 2026-10-16).
+
 ## Testing Rules
 
 ### Never Remove or Skip Tests

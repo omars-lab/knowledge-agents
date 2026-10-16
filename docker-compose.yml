@@ -7,6 +7,11 @@ x-logging: &loki-logging
     max-size: "10m"
     max-file: "3"
 
+# Every port is published on BIND_ADDRESS. It defaults to 127.0.0.1, so on a laptop the stack
+# answers only this Mac. The Makefile sets 0.0.0.0 on the Mac Studio (role: prod in hosts.yml),
+# where other machines call it. Containers still reach these ports through host.docker.internal,
+# and the Loki log driver still reaches localhost:3100.
+
 services:
   # PostgreSQL Database
   postgres:
@@ -17,7 +22,7 @@ services:
       POSTGRES_USER: knowledge
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     ports:
-      - "${POSTGRES_HOST_PORT:-5432}:5432"
+      - "${BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./data/01-init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql
@@ -33,7 +38,7 @@ services:
     image: prom/prometheus:latest
     platform: linux/arm64
     ports:
-      - "9090:9090"
+      - "${BIND_ADDRESS:-127.0.0.1}:9090:9090"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./config/recording_rules.yml:/etc/prometheus/recording_rules.yml
@@ -53,8 +58,8 @@ services:
     image: qdrant/qdrant:latest
     logging: *loki-logging
     ports:
-      - "6333:6333"  # HTTP API
-      - "6334:6334"  # gRPC API
+      - "${BIND_ADDRESS:-127.0.0.1}:6333:6333"  # HTTP API
+      - "${BIND_ADDRESS:-127.0.0.1}:6334:6334"  # gRPC API
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
@@ -76,7 +81,7 @@ services:
       # Mount NotePlan directory for x-callback-url generation
       - "/Users/omareid/Library/Containers/co.noteplan.NotePlan3/Data/Library/Application Support/co.noteplan.NotePlan3/:/noteplan:ro"
     ports:
-      - "8003:8000"  # HTTP API port
+      - "${BIND_ADDRESS:-127.0.0.1}:8003:8000"  # HTTP API port
     command: ["python", "-m", "uvicorn", "tidy_mcp.http_server:app", "--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
     healthcheck:
@@ -93,8 +98,8 @@ services:
       dockerfile: Dockerfile
       target: app
     ports:
-      - "8001:8000"      # Main service port
-      - "8002:8002"      # Metrics port
+      - "${BIND_ADDRESS:-127.0.0.1}:8001:8000"      # Main service port
+      - "${BIND_ADDRESS:-127.0.0.1}:8002:8002"      # Metrics port
     environment:
       - DATABASE_URL=postgresql://knowledge:${POSTGRES_PASSWORD:-changeme}@postgres:5432/knowledge_workflow
       - API_HOST=0.0.0.0
@@ -152,7 +157,7 @@ services:
       dockerfile: Dockerfile
       target: litellm-proxy
     ports:
-      - "4000:4000"
+      - "${BIND_ADDRESS:-127.0.0.1}:4000:4000"
     environment:
       - LM_STUDIO_HOST=${LM_STUDIO_HOST:-mac-studio.local}
       - LM_STUDIO_PORT=${LM_STUDIO_PORT:-1234}
@@ -245,8 +250,8 @@ services:
     image: neo4j:5-community
     logging: *loki-logging
     ports:
-      - "7474:7474"   # Browser UI
-      - "7687:7687"   # Bolt protocol
+      - "${BIND_ADDRESS:-127.0.0.1}:7474:7474"   # Browser UI
+      - "${BIND_ADDRESS:-127.0.0.1}:7687:7687"   # Bolt protocol
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-changeme}
       - NEO4J_PLUGINS=["apoc"]
@@ -268,7 +273,7 @@ services:
       dockerfile: Dockerfile
       target: claude-agent
     ports:
-      - "8004:8000"
+      - "${BIND_ADDRESS:-127.0.0.1}:8004:8000"
     environment:
       - CLAUDE_AGENT_QDRANT_HOST=qdrant
       - CLAUDE_AGENT_QDRANT_PORT=6333
@@ -354,7 +359,7 @@ services:
   loki:
     image: grafana/loki:latest
     ports:
-      - "3100:3100"
+      - "${BIND_ADDRESS:-127.0.0.1}:3100:3100"
     volumes:
       - loki_data:/loki
       - ./config/loki.yml:/etc/loki/local-config.yaml:ro
@@ -365,7 +370,7 @@ services:
   grafana:
     image: grafana/grafana-oss:latest
     ports:
-      - "${GRAFANA_HOST_PORT:-3002}:3000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${GRAFANA_HOST_PORT:-3002}:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
       - GF_AUTH_ANONYMOUS_ENABLED=true
@@ -474,7 +479,7 @@ services:
   langfuse:
     image: langfuse/langfuse:3
     ports:
-      - "3210:3000"
+      - "${BIND_ADDRESS:-127.0.0.1}:3210:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -513,7 +518,7 @@ services:
       - ./chat:/usr/share/nginx/html:ro
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "7128:80"
+      - "${BIND_ADDRESS:-127.0.0.1}:7128:80"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
       interval: 30s

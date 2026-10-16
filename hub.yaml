@@ -35,3 +35,5 @@ hubs:
     # Opened on this Mac (localhost:7128 or knowledge-agents.localhost through the router), the page
     # calls its API at localhost:8004; anywhere else it calls /api/v1 on the same address (Kong).
     # The Mac Studio runs this stack too (`make deploy`, hosts.yml); add a lan: copy once its address is checked.
+    # On this Mac every port is published on 127.0.0.1 only; the Studio publishes on all addresses
+    # (BIND_ADDRESS in the Makefile).
